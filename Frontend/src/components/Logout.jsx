@@ -2,7 +2,7 @@ export default function Logout() {
   return (
     <div className="ms-5 me-4 px-3 py-10">
       <div className="flex flex-row flex-wrap font-semibold justify-end items-center">
-        <button className="flex flex-row flex-wrap text-white hover:text-magenta">
+        <button className="flex flex-row flex-wrap text-white hover:text-[#ff0000]">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="1.5em"

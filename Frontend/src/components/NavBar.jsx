@@ -8,9 +8,9 @@ export default function NavBar() {
         <div className="flex items-center">
           <div className="flex flex-row items-center mx-11">
             <img className="w-20 h-20" src={RTU} alt="Logo" />
-            <button className="font-semibold text-white text-4xl pl-4">
-              <p className="pr-2"> AUTOAQUAMANS</p>
-            </button>
+            
+              <p className=" font-semibold text-white text-4xl pl-4 pr-2"> AUTOAQUAMANS</p>
+
           </div>
         </div>
         <div className="flex flex-row items-center flex-grow">
