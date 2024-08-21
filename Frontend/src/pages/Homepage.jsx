@@ -9,12 +9,12 @@ export default function Homepage() {
   return (
     <div className="flex  flex-wrap flex-row md:flex-row">
       <Navbar></Navbar>
-      <div className="flex">
-      <div className=" grid grid-cols-2 gap-5">
-
+      <div className="flex flex-grow justify-center items-center">
+      <div className=" grid grid-cols-2 gap-11 mt-6">
+        
+        {/* dashboard */}
         <Turbidity></Turbidity>
         <Temperature></Temperature>
-      
         <Oxygen></Oxygen>
         <PhLevel></PhLevel></div>
         </div>
