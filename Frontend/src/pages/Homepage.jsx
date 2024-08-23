@@ -1,8 +1,8 @@
 import Navbar from "../components/NavBar";
 import Dashing from "../components/Dashing";
-import Turbidity from "./turbidity";
+import Turbidity from "./turbidityy";
 import Temperature from "./temp";
-import Oxygen from "./oxygen";
+import Oxygen from "./oxygenn";
 import PhLevel from "./phLevel";
 
 export default function Homepage() {

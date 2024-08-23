@@ -21,6 +21,20 @@ export default function Temp() {
     return () => clearInterval(interval); // Cleanup the interval on component unmount
   }, []);
 
+  const getTemperatureStatus = () => {
+    if (temperature >= 26 && temperature <= 32) {
+      return "Normal";
+    } else if (temperature < 26 && temperature > 20) {
+      return "Below Average";
+    } else if (temperature <= 20) {
+      return "Too Cold!";
+    } else if (temperature > 26 && temperature < 35) {
+      return "Above Average";
+    } else if (temperature >= 35) {
+      return "Too Hot!";
+    }
+  };
+
   return (
     <div className='bg-[#EE6600] rounded-md border p-4 border-gray-100 shadow-md shadow-black/5 h-64 w-96'>
       <div className='flex mb-4'>
@@ -30,8 +44,13 @@ export default function Temp() {
             <div className='font-semibold text-4xl text-white ml-4'>Temperature</div>
           </div>
           <div>
-            <div className='flex justify-end'>
-              <p className='text-white font-semibold text-8xl mb-1'>{temperature ? `${temperature}°C` : "NAN"}</p>
+            <div>
+              <p className='text-white font-semibold text-6xl mb-6'>{temperature ? `${temperature}°C` : "NAN"}</p>
+              <p className='text-white font-semibold text-4xl'>
+              { getTemperatureStatus()}
+              {/* {temperature !== null ? `The water temperature is ${getTemperatureStatus()}` : ""} */}
+            </p>
+
             </div>
           </div>
         </div>
