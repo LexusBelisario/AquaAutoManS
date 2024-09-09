@@ -30,10 +30,10 @@ try:
             # Assuming data is space-separated, like "23.4 7.8 6.5 3.2"
             pieces = data.split()
 
-            if len(pieces) == 4:  # Ensure you have exactly 4 pieces of data
+            if len(pieces) == 8:  
                 try:
-                    cursor.execute("INSERT INTO aquamans (temperature, oxygen, phlevel, turbidity) VALUES (%s, %s, %s, %s)", 
-                                   (pieces[0], pieces[1], pieces[2], pieces[3]))
+                    cursor.execute("INSERT INTO aquamans (temperature, tempResult, oxygen, oxygenResult, phlevel, phResult, turbidity, turbidityResult) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", 
+                                   (pieces[0], pieces[1], pieces[2], pieces[3], pieces[4], pieces[5], pieces[6], pieces[7]))
                     dbConn.commit()
                 except MySQLdb.IntegrityError as err:
                     print(f"Failed to insert data: {err}")

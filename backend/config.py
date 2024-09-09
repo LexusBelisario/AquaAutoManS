@@ -1,11 +1,13 @@
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
+from sqlalchemy import text
+
+
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app, resources={r"/*": {"origins": "*"}})  # Enable CORS for all routes
 
-# Configure the database URI
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/dbserial'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
@@ -23,7 +25,7 @@ def get_temperature():
         latest_record = aquamans.query.order_by(aquamans.id.desc()).first()
         if latest_record:
             temperature = latest_record.temperature
-            if isinstance(temperature, (int, float)):  # Ensure it's a number
+            if isinstance(temperature, (int, float)): 
                 return jsonify({'temperature': temperature})
             else:
                 return jsonify({'temperature': 'Invalid data type'})
@@ -32,6 +34,8 @@ def get_temperature():
     except Exception as e:
         print(f"Error fetching temperature: {e}")
         return jsonify({'error': str(e)})
+    
+    
     
 @app.route('/oxygen', methods=['GET'])
 def get_oxygen():
@@ -84,6 +88,28 @@ def get_turbidity():
 
 
 
+@app.route('/data', methods=['GET'])
+def get_data():
+    try:
+        # Open a connection to the database
+        with db.engine.connect() as connection:
+            # Execute the raw SQL query
+            result = connection.execute(text("SELECT * FROM aquamans"))
+
+            # Get column names from the result metadata
+            columns = result.keys()
+            
+            # Convert each row to a dictionary using the column names
+            records = [dict(zip(columns, row)) for row in result]
+
+            print(f"Total records fetched: {len(records)}")  # Debugging: Check the number of records fetched
+            print(f"Fetched data: {records}")  # Debugging: Print the data fetched
+
+            # No need for further conversion since records is already a list of dictionaries
+            return jsonify(records)
+    except Exception as e:
+        print(f"Error fetching data: {e}")
+        return jsonify({'error': str(e)})
 
 
 if __name__ == '__main__':
