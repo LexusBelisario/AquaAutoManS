@@ -7,13 +7,11 @@ import Logs from "./pages/DataLogs.jsx";
 
 export default function App() {
   const [auth, setAuth] = useState(() => {
-    // Check authentication state from localStorage
     const savedAuth = localStorage.getItem("auth");
     return savedAuth === "true";
   });
 
   useEffect(() => {
-    // Save authentication state to localStorage
     localStorage.setItem("auth", auth);
   }, [auth]);
 

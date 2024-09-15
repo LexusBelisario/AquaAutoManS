@@ -10,7 +10,7 @@ export default function Temp() {
   useEffect(() => {
     const fetchTemperature = async () => {
       try {
-        const response = await fetch("http://127.0.0.1:5000/temperature"); // Update the URL to your Flask API endpoint
+        const response = await fetch("http://127.0.0.1:5000/temperature");
         const data = await response.json();
         setTemperature(data.temperature);
       } catch (error) {
@@ -20,8 +20,8 @@ export default function Temp() {
 
     fetchTemperature();
 
-    const interval = setInterval(fetchTemperature, 5000); // Fetch new data every 5 seconds
-    return () => clearInterval(interval); // Cleanup the interval on component unmount
+    const interval = setInterval(fetchTemperature, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const getTemperatureStatus = () => {
@@ -62,13 +62,13 @@ export default function Temp() {
     } else if (temperature < 26 && temperature > 20) {
       return "bg-blue-500";
     } else if (temperature <= 20 && temperature === 0) {
-      return "bg-light-blue-500"; // Tailwind may need a custom color
+      return "bg-light-blue-500";
     } else if (temperature > 32 && temperature < 35) {
       return "bg-orange-500";
     } else if (temperature >= 35) {
       return "bg-[#a70000]";
     } else {
-      return "bg-gray-200"; // Default color for error or unknown
+      return "bg-gray-200";
     }
   };
 

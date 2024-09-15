@@ -33,9 +33,8 @@ export const LineGraphTemp = () => {
         );
         const data = await response.json();
 
-        console.log("Fetched data:", data); // Debugging: Check the fetched data
+        console.log("Fetched data:", data);
 
-        // Process data to group by day of the week
         const processedData = processTemperatureData(data);
 
         setTemperatureData(processedData);
@@ -49,7 +48,6 @@ export const LineGraphTemp = () => {
     fetchTemperatureData();
   }, []);
 
-  // Process data to fit temperature intervals and days of the week
   const processTemperatureData = (data) => {
     const labels = [
       "Monday",
@@ -62,23 +60,20 @@ export const LineGraphTemp = () => {
     ];
     const temperatures = [50, 40, 30, 20, 10, 0].map(() => []);
 
-    // Initialize temperature data arrays for each day of the week
     const dailyTemperatures = Array(7)
       .fill(0)
       .map(() => []);
 
     data.forEach((entry) => {
       const date = new Date(entry.timeData);
-      const dayIndex = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      const dayIndex = date.getDay();
       const temp = entry.temperature;
 
       if (dayIndex >= 1) {
-        // Convert Sunday to last index of the week
         dailyTemperatures[dayIndex - 1].push(temp);
       }
     });
 
-    // Convert daily temperature arrays to average temperatures
     const avgTemperatures = dailyTemperatures.map((tempArray) => {
       if (tempArray.length === 0) return 0;
       return tempArray.reduce((sum, temp) => sum + temp, 0) / tempArray.length;

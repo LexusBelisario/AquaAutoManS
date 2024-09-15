@@ -10,7 +10,7 @@ export default function oxygenn() {
   useEffect(() => {
     const fetchOxygen = async () => {
       try {
-        const response = await fetch("http://127.0.0.1:5000/oxygen"); // Update the URL to your Flask API endpoint
+        const response = await fetch("http://127.0.0.1:5000/oxygen");
         const data = await response.json();
         setOxygen(data.oxygen);
       } catch (error) {
@@ -20,8 +20,8 @@ export default function oxygenn() {
 
     fetchOxygen();
 
-    const interval = setInterval(fetchOxygen, 5000); // Fetch new data every 5 seconds
-    return () => clearInterval(interval); // Cleanup the interval on component unmount
+    const interval = setInterval(fetchOxygen, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const getOxygenConditionMessage = () => {

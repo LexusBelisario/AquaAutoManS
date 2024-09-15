@@ -8,7 +8,7 @@ export default function Logout({ setAuth }) {
     if (typeof setAuth === "function") {
       setAuth(false);
       localStorage.removeItem("auth");
-      navigate("/"); // Navigate to the home page or default route
+      navigate("/");
     } else {
       console.error("setAuth is not a function");
     }

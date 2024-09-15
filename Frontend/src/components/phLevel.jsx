@@ -11,7 +11,7 @@ export default function phLevel() {
   useEffect(() => {
     const fetchphlevel = async () => {
       try {
-        const response = await fetch("http://127.0.0.1:5000/phlevel"); // Update the URL to your Flask API endpoint
+        const response = await fetch("http://127.0.0.1:5000/phlevel");
         const data = await response.json();
         setphlevel(data.phlevel);
       } catch (error) {
@@ -21,8 +21,8 @@ export default function phLevel() {
 
     fetchphlevel();
 
-    const interval = setInterval(fetchphlevel, 5000); // Fetch new data every 5 seconds
-    return () => clearInterval(interval); // Cleanup the interval on component unmount
+    const interval = setInterval(fetchphlevel, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const getConditionMessage = () => {

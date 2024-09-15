@@ -10,7 +10,6 @@ export default function Login({ setAuth }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Replace this with your actual authentication logic
     if (username === "admin" && password === "admin") {
       setAuth(true);
       navigate("/main");

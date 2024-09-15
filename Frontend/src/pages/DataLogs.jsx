@@ -25,7 +25,7 @@ export default function DataLogs({ setAuth }) {
               (row.temperature >= 20 && row.temperature <= 26) ||
               (row.temperature >= 32 && row.temperature <= 35)
                 ? "red"
-                : "black", // Only change font color
+                : "black",
             padding: "8px",
           }}
         >
@@ -56,6 +56,16 @@ export default function DataLogs({ setAuth }) {
       selector: (row) => row["turbidityResult"],
       sortable: true,
     },
+    {
+      name: "Alive Catfish",
+      selector: (row) => row["catfish"],
+      sortable: true,
+    },
+    {
+      name: "Dead Catfish",
+      selector: (row) => row["dead_catfish"],
+      sortable: true,
+    },
     { name: "Time", selector: (row) => row["timeData"], sortable: true },
   ];
 
@@ -63,42 +73,38 @@ export default function DataLogs({ setAuth }) {
     const fetchData = async () => {
       try {
         const response = await axios.get("http://localhost:5000/data");
-        console.log("API Response:", response.data); // Log entire response
+        console.log("API Response:", response.data);
         setData(response.data);
-        applyFilter(response.data); // Apply filter to the fetched data
+        applyFilter(response.data);
       } catch (error) {
         console.error("Error fetching data:", error);
       }
     };
 
     fetchData();
-    const intervalId = setInterval(fetchData, 5000); // Fetch new data every 5 seconds
+    const intervalId = setInterval(fetchData, 5000);
 
-    return () => clearInterval(intervalId); // Cleanup on component unmount
-  }, [filterDate]); // Reapply filter when filterDate changes
+    return () => clearInterval(intervalId);
+  }, [filterDate]);
 
-  // Apply date filter to data
   const applyFilter = (dataToFilter) => {
     if (filterDate) {
       const filtered = dataToFilter.filter((row) => {
-        // Extract date part from timestamp (assuming row.timeData is the timestamp)
-        const rowDate = new Date(row.timeData).toISOString().split("T")[0]; // Get YYYY-MM-DD
+        const rowDate = new Date(row.timeData).toISOString().split("T")[0];
         return rowDate === filterDate;
       });
       setFilteredData(filtered);
     } else {
-      setFilteredData(dataToFilter); // No filter applied
+      setFilteredData(dataToFilter);
     }
   };
 
-  // Handle date input change
   const handleDateChange = (e) => {
     const selectedDate = e.target.value;
     setFilterDate(selectedDate);
-    applyFilter(data); // Reapply filter when date changes
+    applyFilter(data);
   };
 
-  // Function to print only the table
   const handlePrint = () => {
     const printWindow = window.open("", "", "height=600,width=800");
     printWindow.document.write("<html><head><title>Print Table</title>");
@@ -117,10 +123,9 @@ export default function DataLogs({ setAuth }) {
     filteredData.forEach((row) => {
       printWindow.document.write("<tr>");
       columns.forEach((column) => {
-        const cellData = column.selector(row); // Get cell data using selector function
-        let cellColor = "black"; // Default color
+        const cellData = column.selector(row);
+        let cellColor = "black";
 
-        // Apply the same logic for color styling as in the React component
         if (
           column.name === "Temperature" &&
           ((row.temperature <= 20 && row.temperature !== 0) ||
@@ -130,7 +135,7 @@ export default function DataLogs({ setAuth }) {
             (row.temperature >= 20 && row.temperature <= 26) ||
             (row.temperature >= 32 && row.temperature <= 35))
         ) {
-          cellColor = "red"; // Change color based on condition
+          cellColor = "red";
         }
 
         printWindow.document.write(

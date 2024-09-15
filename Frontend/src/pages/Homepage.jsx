@@ -8,23 +8,24 @@ import PhLevel from "../components/phLevel";
 import AliveCatfish from "../components/aliveCatfish";
 import DeadCatfish from "../components/deadCatfish";
 import { LineGraphTemp } from "../graphs/lineGraphTemp";
+import LiveMonitoring from "../pages/LiveMonitoring";
 
 export default function Homepage({ setAuth }) {
   return (
     <div className="min-h-screen bg-[#F0F8FF] overflow-hidden">
-      {/* Fixed Navbar */}
+      {/* Navbar */}
       <div className="fixed top-0 left-0 right-0 z-50">
         <Navbar />
       </div>
 
       {/* Main content container */}
       <div className="flex mt-16">
-        {/* Fixed Sidebar */}
+        {/* Sidebar */}
         <div className="fixed top-16 left-0 z-40">
           <Sidebar setAuth={setAuth} />
         </div>
 
-        {/* Main content area */}
+        {/* Main content*/}
         <div className="flex-1 flex flex-col items-center justify-center ml-48 mt-8 space-y-10 px-4">
           {/* Dashboard components */}
           <div className="flex flex-wrap justify-center items-start space-x-10 px-4">
@@ -39,8 +40,13 @@ export default function Homepage({ setAuth }) {
             <AliveCatfish />
             <DeadCatfish />
           </div>
+          {/* Graph Components */}
           <div className="w-full max-w-4xl justify-center">
             <LineGraphTemp />
+          </div>
+          {/* Live monitoring component */}
+          <div className="w-full max-w-4xl justify-center">
+            <LiveMonitoring />
           </div>
         </div>
       </div>

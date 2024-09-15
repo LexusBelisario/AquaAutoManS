@@ -3,7 +3,6 @@ import MySQLdb
 import time
 import sys
 
-# Connect to the MySQL database
 try:
     dbConn = MySQLdb.connect(host="localhost", user="root", passwd="", db="dbserial")
     cursor = dbConn.cursor()
@@ -11,7 +10,7 @@ except MySQLdb.Error as err:
     print(f"Could not connect to database: {err}")
     sys.exit(1)
 
-device = 'COM4'  # Change this to your actual serial port
+device = 'COM4' 
 
 try:
     print("Trying...", device)
@@ -23,11 +22,10 @@ except serial.SerialException as e:
 try:
     while True:
         try:
-            time.sleep(1)  # Wait for the connection to stabilize
-            data = arduino.readline().decode('utf-8').strip()  # Ensure data is decoded and stripped of newlines
+            time.sleep(1) 
+            data = arduino.readline().decode('utf-8').strip()
             print(f"Received data: {data}")
 
-            # Assuming data is space-separated, like "23.4 7.8 6.5 3.2"
             pieces = data.split()
 
             if len(pieces) == 8:  
