@@ -25,11 +25,32 @@ export const LineGraphTemp = () => {
   const [temperatureData, setTemperatureData] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // useEffect(() => {
+  //   const fetchTemperatureData = async () => {
+  //     try {
+  //       const response = await fetch(
+  //         "http://localhost:5000/weekly-temperature-data"
+  //       );
+  //       const data = await response.json();
+
+  //       console.log("Fetched data:", data);
+
+  //       const processedData = processTemperatureData(data);
+
+  //       setTemperatureData(processedData);
+  //       setLoading(false);
+  //     } catch (error) {
+  //       console.error("Error fetching temperature data:", error);
+  //       setLoading(false);
+  //     }
+  //   };
+
+
   useEffect(() => {
     const fetchTemperatureData = async () => {
       try {
         const response = await fetch(
-          "http://localhost:5000/weekly-temperature-data"
+          "http://127.0.0.1:5000/weekly-temperature-data"
         );
         const data = await response.json();
 
@@ -44,7 +65,6 @@ export const LineGraphTemp = () => {
         setLoading(false);
       }
     };
-
     fetchTemperatureData();
   }, []);
 
