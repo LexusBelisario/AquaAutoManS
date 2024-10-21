@@ -9,6 +9,7 @@ import threading
 import logging
 import time
 
+
 logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
@@ -105,9 +106,12 @@ def get_temperature_data():
 @app.route('/weekly-temperature-data', methods=['GET'])
 def get_weekly_temperature_data():
     try:
+        # Get the filter type from query parameters (default is 'weekly')
+        filter_type = request.args.get('filter', 'weekly')
+        
         today = datetime.utcnow()
-        start_of_week = today - timedelta(days=today.weekday())  
-        end_of_week = start_of_week + timedelta(days=6) 
+        start_of_week = today - timedelta(days=today.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
 
         with db.engine.connect() as connection:
             query = text("""
@@ -118,12 +122,99 @@ def get_weekly_temperature_data():
             result = connection.execute(query, {'start_date': start_of_week, 'end_date': end_of_week})
             columns = result.keys()
             records = [dict(zip(columns, row)) for row in result]
-            return jsonify(records)
+
+            if filter_type == '3hours':
+                # Filter the data to show every 3 hours
+                filtered_records = []
+                for record in records:
+                    time_data = record['timeData']
+                    hour = time_data.hour
+                    if hour % 3 == 0:  # Select data points at 3-hour intervals
+                        filtered_records.append(record)
+                return jsonify(filtered_records)
+            else:
+                # Default to weekly data
+                return jsonify(records)
     except Exception as e:
         print(f"Error fetching weekly temperature data: {e}")
         return jsonify({'error': str(e)})
     
+@app.route('/weekly-oxygen-data', methods=['GET'])
+def get_weekly_oxygen_data():
+    try:
+        # Get the filter type from query parameters (default is 'weekly')
+        filter_type = request.args.get('filter', 'weekly')
+
+        today = datetime.utcnow()
+        start_of_week = today - timedelta(days=today.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+
+        with db.engine.connect() as connection:
+            query = text("""
+                SELECT oxygen, timeData
+                FROM aquamans
+                WHERE timeData >= :start_date AND timeData <= :end_date
+            """)
+            result = connection.execute(query, {'start_date': start_of_week, 'end_date': end_of_week})
+            columns = result.keys()
+            records = [dict(zip(columns, row)) for row in result]
+
+            if filter_type == '3hours':
+                # Filter the data to show every 3 hours
+                filtered_records = []
+                for record in records:
+                    time_data = record['timeData']
+                    hour = time_data.hour
+                    if hour % 3 == 0:  # Select data points at 3-hour intervals
+                        filtered_records.append(record)
+                return jsonify(filtered_records)
+            else:
+                # Default to weekly data
+                return jsonify(records)
+    except Exception as e:
+        print(f"Error fetching weekly oxygen data: {e}")
+        return jsonify({'error': str(e)})
+
+
+@app.route('/weekly-ph-data', methods=['GET'])
+def get_weekly_phlevel_data():
+    try:
+        # Get the filter type from query parameters (default is 'weekly')
+        filter_type = request.args.get('filter', 'weekly')
+
+        today = datetime.utcnow()
+        start_of_week = today - timedelta(days=today.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+
+        with db.engine.connect() as connection:
+            query = text("""
+                SELECT phlevel, timeData
+                FROM aquamans
+                WHERE timeData >= :start_date AND timeData <= :end_date
+            """)
+            result = connection.execute(query, {'start_date': start_of_week, 'end_date': end_of_week})
+            columns = result.keys()
+            records = [dict(zip(columns, row)) for row in result]
+
+            if filter_type == '3hours':
+                # Filter the data to show every 3 hours
+                filtered_records = []
+                for record in records:
+                    time_data = record['timeData']
+                    hour = time_data.hour
+                    if hour % 3 == 0:  # Select data points at 3-hour intervals
+                        filtered_records.append(record)
+                return jsonify(filtered_records)
+            else:
+                # Default to weekly data
+                return jsonify(records)
+    except Exception as e:
+        print(f"Error fetching weekly oxygen data: {e}")
+        return jsonify({'error': str(e)})
     
+
+if __name__ == "__main__":
+    app.run(debug=True)
     
 modelll = YOLO('C:/Users/user/AquaAutoManS/machine_learning/weights/best.pt')
 
@@ -151,6 +242,38 @@ def update_sensor_data():
     logging.debug(f"Updated sensor data: {sensor_data}")
     return jsonify({'status': 'success'})
 
+
+@app.route('/camera_feed', methods=['GET'])
+def camera_feed():
+    # Try to initialize the Raspberry Pi camera
+    try:
+        pi_camera = cv2.VideoCapture(0)  # Replace with appropriate ID for the Pi camera
+        if pi_camera.isOpened():
+            return Response(generate_frames(pi_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
+    except Exception as e:
+        print("Error opening Raspberry Pi camera:", e)
+
+    # If Pi camera fails, try to initialize the IP camera
+    camera_url = 'http://192.168.18.137:8080/video'
+    ip_camera = cv2.VideoCapture(camera_url)
+
+    if not ip_camera.isOpened():
+        return jsonify({'error': 'No cameras available'}), 404
+
+    return Response(generate_frames(ip_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+def generate_frames(camera):
+    while True:
+        success, frame = camera.read()
+        if not success:
+            break
+        frame = cv2.resize(frame, (640, 480))  # Adjust frame size as needed
+        ret, buffer = cv2.imencode('.jpg', frame)
+        if not ret:
+            continue
+        frame = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 
 def generate_frames():

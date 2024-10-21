@@ -24,33 +24,13 @@ ChartJS.register(
 export const LineGraphTemp = () => {
   const [temperatureData, setTemperatureData] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // useEffect(() => {
-  //   const fetchTemperatureData = async () => {
-  //     try {
-  //       const response = await fetch(
-  //         "http://localhost:5000/weekly-temperature-data"
-  //       );
-  //       const data = await response.json();
-
-  //       console.log("Fetched data:", data);
-
-  //       const processedData = processTemperatureData(data);
-
-  //       setTemperatureData(processedData);
-  //       setLoading(false);
-  //     } catch (error) {
-  //       console.error("Error fetching temperature data:", error);
-  //       setLoading(false);
-  //     }
-  //   };
-
+  const [filter, setFilter] = useState("weekly"); // default filter is 'weekly'
 
   useEffect(() => {
     const fetchTemperatureData = async () => {
       try {
         const response = await fetch(
-          "http://127.0.0.1:5000/weekly-temperature-data"
+          `http://127.0.0.1:5000/weekly-temperature-data?filter=${filter}`
         );
         const data = await response.json();
 
@@ -66,19 +46,23 @@ export const LineGraphTemp = () => {
       }
     };
     fetchTemperatureData();
-  }, []);
+  }, [filter]); // refetch data when filter changes
 
   const processTemperatureData = (data) => {
-    const labels = [
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-      "Sunday",
-    ];
-    const temperatures = [50, 40, 30, 20, 10, 0].map(() => []);
+    const labels =
+      filter === "3hours"
+        ? []
+        : [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+          ];
+    const temperatures =
+      filter === "3hours" ? [] : [50, 40, 30, 20, 10, 0].map(() => []);
 
     const dailyTemperatures = Array(7)
       .fill(0)
@@ -86,11 +70,17 @@ export const LineGraphTemp = () => {
 
     data.forEach((entry) => {
       const date = new Date(entry.timeData);
-      const dayIndex = date.getDay();
       const temp = entry.temperature;
 
-      if (dayIndex >= 1) {
-        dailyTemperatures[dayIndex - 1].push(temp);
+      if (filter === "3hours") {
+        const timeLabel = `${date.getHours()}:00 ${date.toLocaleDateString()}`;
+        labels.push(timeLabel);
+        temperatures.push(temp);
+      } else {
+        const dayIndex = date.getDay();
+        if (dayIndex >= 1) {
+          dailyTemperatures[dayIndex - 1].push(temp);
+        }
       }
     });
 
@@ -100,13 +90,27 @@ export const LineGraphTemp = () => {
     });
 
     return {
-      labels: labels,
+      labels:
+        filter === "3hours"
+          ? labels
+          : [
+              "Monday",
+              "Tuesday",
+              "Wednesday",
+              "Thursday",
+              "Friday",
+              "Saturday",
+              "Sunday",
+            ],
       datasets: [
         {
-          label: "Average Temperature",
-          data: avgTemperatures,
+          label:
+            filter === "3hours"
+              ? "Temperature Every 3 Hours"
+              : "Average Temperature",
+          data: filter === "3hours" ? temperatures : avgTemperatures,
           fill: false,
-          borderColor: "blue",
+          borderColor: "#FF5F1F",
           tension: 0.1,
         },
       ],
@@ -121,7 +125,10 @@ export const LineGraphTemp = () => {
       },
       title: {
         display: true,
-        text: "Weekly Temperature",
+        text:
+          filter === "3hours"
+            ? "Temperature Every 3 Hours"
+            : "Weekly Temperature",
       },
     },
   };
@@ -130,6 +137,13 @@ export const LineGraphTemp = () => {
     <div>Loading...</div>
   ) : (
     <div className="w-full max-w-screen-lg mx-auto">
+      <div className="mb-4">
+        <label>Filter: </label>
+        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <option value="weekly">Weekly</option>
+          <option value="3hours">Every 3 Hours</option>
+        </select>
+      </div>
       {temperatureData.labels.length > 0 ? (
         <Line options={options} data={temperatureData} />
       ) : (

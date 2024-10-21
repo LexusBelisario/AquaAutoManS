@@ -4,6 +4,7 @@ import Home from "./pages/Homepage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/loginPage.jsx";
 import Logs from "./pages/DataLogs.jsx";
+import AboutUs from "./pages/AboutUs.jsx";
 
 export default function App() {
   const [auth, setAuth] = useState(() => {
@@ -32,6 +33,14 @@ export default function App() {
           element={
             <ProtectedRoute auth={auth}>
               <Logs setAuth={setAuth} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/aboutus"
+          element={
+            <ProtectedRoute auth={auth}>
+              <AboutUs setAuth={setAuth} />
             </ProtectedRoute>
           }
         />

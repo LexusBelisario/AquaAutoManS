@@ -8,6 +8,8 @@ export default function DataLogs({ setAuth }) {
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [filterDate, setFilterDate] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const columns = [
     {
@@ -37,14 +39,82 @@ export default function DataLogs({ setAuth }) {
       name: "Temperature Result",
       selector: (row) => row["tempResult"],
       sortable: true,
+      cell: (row) => (
+        <div
+          style={{
+            color:
+              row.tempResult === "BelowAverageTemperature" ||
+              row.tempResult === "ColdTemperature" ||
+              row.tempResult === "AboveAverageTemperature" ||
+              row.tempResult === "HotTemperature"
+                ? "red"
+                : "black",
+            padding: "8px",
+          }}
+        >
+          {row.tempResult}
+        </div>
+      ),
     },
-    { name: "Oxygen", selector: (row) => row["oxygen"], sortable: true },
+    {
+      name: "Oxygen",
+      selector: (row) => row["oxygen"],
+      sortable: true,
+      cell: (row) => (
+        <div
+          style={{
+            color:
+              row.oxygen === 0 || row.oxygen < 1.5 || row.oxygen < 5
+                ? "red"
+                : "black",
+            padding: "8px",
+          }}
+        >
+          {row.oxygen}
+        </div>
+      ),
+    },
     {
       name: "Oxygen Result",
       selector: (row) => row["oxygenResult"],
       sortable: true,
+      cell: (row) => (
+        <div
+          style={{
+            color:
+              row.oxygenResult === "VeryLowOxygen" ||
+              row.oxygenResult === "LowOxygen" ||
+              row.oxygenResult === "HighOxygen"
+                ? "red"
+                : "black",
+            padding: "8px",
+          }}
+        >
+          {row.oxygenResult}
+        </div>
+      ),
     },
-    { name: "pH Level", selector: (row) => row["phlevel"], sortable: true },
+    {
+      name: "pH Level",
+      selector: (row) => row["phlevel"],
+      sortable: true,
+      cell: (row) => (
+        <div
+          style={{
+            color:
+              (row.phlevel >= 4 && row.phlevel < 6) ||
+              row.phlevel < 4 ||
+              (row.phlevel > 7 && row.phlevel <= 9) ||
+              row.phlevel < 9
+                ? "red"
+                : "black",
+            padding: "8px",
+          }}
+        >
+          {row.phlevel}
+        </div>
+      ),
+    },
     {
       name: "pH Level Result",
       selector: (row) => row["phResult"],
@@ -73,7 +143,6 @@ export default function DataLogs({ setAuth }) {
     const fetchData = async () => {
       try {
         const response = await axios.get("http://localhost:5000/data");
-        console.log("API Response:", response.data);
         setData(response.data);
         applyFilter(response.data);
       } catch (error) {
@@ -105,7 +174,19 @@ export default function DataLogs({ setAuth }) {
     applyFilter(data);
   };
 
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleRowsPerPageChange = (newRowsPerPage) => {
+    setRowsPerPage(newRowsPerPage);
+  };
+
   const handlePrint = () => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    const rowsToPrint = filteredData.slice(startIndex, endIndex);
+
     const printWindow = window.open("", "", "height=600,width=800");
     printWindow.document.write("<html><head><title>Print Table</title>");
     printWindow.document.write("</head><body>");
@@ -120,12 +201,13 @@ export default function DataLogs({ setAuth }) {
     });
 
     printWindow.document.write("</tr></thead><tbody>");
-    filteredData.forEach((row) => {
+    rowsToPrint.forEach((row) => {
       printWindow.document.write("<tr>");
       columns.forEach((column) => {
         const cellData = column.selector(row);
         let cellColor = "black";
 
+        // Check temperature conditions
         if (
           column.name === "Temperature" &&
           ((row.temperature <= 20 && row.temperature !== 0) ||
@@ -134,6 +216,41 @@ export default function DataLogs({ setAuth }) {
             row.temperature < 0 ||
             (row.temperature >= 20 && row.temperature <= 26) ||
             (row.temperature >= 32 && row.temperature <= 35))
+        ) {
+          cellColor = "red";
+        }
+        if (
+          column.name === "Temperature Result" &&
+          (row.tempResult === "BelowAverageTemperature" ||
+            row.tempResult === "ColdTemperature" ||
+            row.tempResult === "AboveAverageTemperature" ||
+            row.tempResult === "HotTemperature")
+        ) {
+          cellColor = "red";
+        }
+        // Check oxygen conditions
+        if (
+          column.name === "Oxygen" &&
+          (row.oxygen === 0 || row.oxygen < 1.5 || row.oxygen < 5)
+        ) {
+          cellColor = "red";
+        }
+
+        if (
+          column.name === "Oxygen Result" &&
+          (row.oxygenResult === "VeryLowOxygen" ||
+            row.oxygenResult === "LowOxygen" ||
+            row.oxygenResult === "HighOxygen")
+        ) {
+          cellColor = "red";
+        }
+        // Check pH level conditions
+        if (
+          column.name === "pH Level" &&
+          ((row.phlevel >= 4 && row.phlevel < 6) ||
+            row.phlevel < 4 ||
+            (row.phlevel > 7 && row.phlevel <= 9) ||
+            row.phlevel < 9)
         ) {
           cellColor = "red";
         }
@@ -148,7 +265,6 @@ export default function DataLogs({ setAuth }) {
     printWindow.document.write("</body></html>");
     printWindow.document.close();
     printWindow.focus();
-    printWindow.print();
   };
 
   return (
@@ -179,11 +295,19 @@ export default function DataLogs({ setAuth }) {
             className="text-purple-700 hover:text-white border border-purple-700 hover:bg-purple-800 focus:ring-4 focus:outline-none focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center mb-2 dark:border-purple-400 dark:text-purple-400 dark:hover:text-white dark:hover:bg-purple-500 dark:focus:ring-purple-900"
             onClick={handlePrint}
           >
-            Print
+            Print Current Page
           </button>
 
           <div id="printable-table">
-            <DataTable columns={columns} data={filteredData} pagination />
+            <DataTable
+              columns={columns}
+              data={filteredData}
+              pagination
+              paginationPerPage={rowsPerPage}
+              paginationRowsPerPageOptions={[10, 20, 30, 50]}
+              onChangePage={handlePageChange}
+              onChangeRowsPerPage={handleRowsPerPageChange}
+            />
           </div>
         </div>
       </div>
