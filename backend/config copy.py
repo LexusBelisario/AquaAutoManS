@@ -3,17 +3,15 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy import text
 from datetime import datetime, timedelta
-import threading
 import logging
-import time
-
 
 logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/dbserial'
+# DONT CHANGE!!
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://admin:password@localhost/dbserial'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 

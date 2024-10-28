@@ -16,12 +16,14 @@ import axios from "axios";
 
 export default function Homepage({ setAuth }) {
   const [alerts, setAlerts] = useState([]);
+  const [catfishCounts, setCatfishCounts] = useState({ alive: 0, dead: 0 });
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const response = await axios.get("http://localhost:5000/data");
         const data = response.data;
+        updateCatfishCounts(data);
         checkWaterConditions(data);
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -30,9 +32,20 @@ export default function Homepage({ setAuth }) {
 
     fetchData();
     const intervalId = setInterval(fetchData, 5000);
-
     return () => clearInterval(intervalId);
   }, []);
+
+  const updateCatfishCounts = (data) => {
+    if (data.length > 0) {
+      const latestRow = data[data.length - 1];
+      setCatfishCounts({
+        alive: latestRow.catfish,
+        dead: latestRow.dead_catfish,
+      });
+    } else {
+      setCatfishCounts({ alive: 0, dead: 0 });
+    }
+  };
 
   const checkWaterConditions = (data) => {
     let messages = [];
@@ -40,55 +53,41 @@ export default function Homepage({ setAuth }) {
     if (data.length > 0) {
       const latestRow = data[data.length - 1];
 
-      // Check temperature
+      // Check for water quality conditions
       if (latestRow.temperature < 20) {
         messages.push("The temperature is too low. Please change the water.");
       } else if (latestRow.temperature > 35) {
         messages.push("The temperature is too high. Please change the water.");
       }
 
-      // Check oxygen
       if (latestRow.oxygen < 5) {
         messages.push("The oxygen level is too low. Please change the water.");
       } else if (latestRow.oxygen > 10) {
         messages.push("The oxygen level is too high. Please change the water.");
       }
 
-      // Check pH level
       if (latestRow.phlevel < 6.5) {
         messages.push("The pH level is too low. Please change the water.");
       } else if (latestRow.phlevel > 9) {
         messages.push("The pH level is too high. Please change the water.");
       }
 
-      // Check turbidity
       if (latestRow.turbidity >= 50) {
         messages.push(
           "The water is dirty (turbidity too high). Please change the water."
         );
       }
 
-      if (latestRow.dead_catfish > 0) {
-        const causes = [];
-        if (latestRow.temperature < 20 || latestRow.temperature > 35) {
-          causes.push(`Temperature: ${latestRow.temperature}°C`);
-        }
-        if (latestRow.oxygen < 5 || latestRow.oxygen > 10) {
-          causes.push(`Oxygen: ${latestRow.oxygen} mg/L`);
-        }
-        if (latestRow.phlevel < 6.5 || latestRow.phlevel > 9) {
-          causes.push(`pH Level: ${latestRow.phlevel}`);
-        }
-
-        const causeMessage =
-          causes.length > 0
-            ? `Causes: ${causes.join(", ")}`
-            : "No specific causes detected.";
-        messages.push(
-          `A catfish has died at ${latestRow.timeData}. ${causeMessage} Please remove it immediately.`
-        );
+      // Check catfish detection
+      if (latestRow.catfish === 0 && latestRow.dead_catfish === 0) {
+        messages.push("No catfish detected in the system.");
       } else {
-        messages.push("All catfish are alive.");
+        if (latestRow.catfish > 0) {
+          messages.push(`${latestRow.catfish} alive catfish detected.`);
+        }
+        if (latestRow.dead_catfish > 0) {
+          messages.push(`${latestRow.dead_catfish} dead catfish detected.`);
+        }
       }
 
       setAlerts(messages);

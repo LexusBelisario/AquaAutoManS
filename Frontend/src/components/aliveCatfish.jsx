@@ -2,15 +2,24 @@ import React, { useEffect, useState } from "react";
 import fish from "../images/fishCat.svg";
 
 export default function AliveCatfish() {
-  const [catfishCount, setCatfishCount] = useState(0);
+  const [aliveCount, setAliveCount] = useState(0);
 
   useEffect(() => {
-    fetch("http://localhost:5000/catfish")
-      .then((response) => response.json())
-      .then((data) => {
-        setCatfishCount(data.catfish || 0);
-      })
-      .catch((error) => console.error("Error fetching catfish count:", error));
+    const fetchAliveCount = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/data"); // Update with your API endpoint
+        const data = await response.json();
+        const latestRecord = data[data.length - 1];
+        setAliveCount(latestRecord.catfish || 0);
+      } catch (error) {
+        console.error("Error fetching alive catfish count:", error);
+      }
+    };
+
+    fetchAliveCount();
+    const interval = setInterval(fetchAliveCount, 5000); // Refresh every 5 seconds
+
+    return () => clearInterval(interval); // Cleanup on component unmount
   }, []);
 
   return (
@@ -22,7 +31,7 @@ export default function AliveCatfish() {
           <img className="w-8 h-8" src={fish} alt="Alive Pic" />
         </div>
         <div className="flex justify-end mt-2">
-          <p className="text-black font-semibold text-4xl">{catfishCount}</p>
+          <p className="text-black font-semibold text-4xl">{aliveCount}</p>
         </div>
       </div>
     </div>

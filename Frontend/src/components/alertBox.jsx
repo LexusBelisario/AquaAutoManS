@@ -1,15 +1,30 @@
+// components/AlertBox.js
 import React from "react";
 
-const AlertBox = ({ alerts }) => {
+export default function AlertBox({ alerts }) {
   return (
-    <div className="bg-red-100 border border-red-400 text-red-700 p-4 rounded relative">
+    <div className="bg-white border border-gray-200 shadow-md rounded-lg p-4">
+      <h2 className="text-lg font-bold text-red-600 mb-2">
+        Alert Notifications
+      </h2>
       {alerts.length === 0 ? (
-        <p>No alerts</p>
+        <p className="text-gray-500">No alerts at this time.</p>
       ) : (
-        alerts.map((alert, index) => <p key={index}>{alert}</p>)
+        <ul className="space-y-2">
+          {alerts.map((alert, index) => (
+            <li
+              key={index}
+              className={`p-2 rounded-md ${
+                alert.includes("died")
+                  ? "bg-red-100 text-red-800"
+                  : "bg-yellow-100 text-yellow-800"
+              }`}
+            >
+              {alert}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
-};
-
-export default AlertBox;
+}

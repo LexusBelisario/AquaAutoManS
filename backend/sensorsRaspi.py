@@ -1,14 +1,13 @@
 import serial
-import mysql.connector  # Import MySQL Connector
+import mysql.connector  
 import time
 import sys
 
-# Establishing a connection to the MySQL database
 try:
     dbConn = mysql.connector.connect(
         host="localhost",
         user="admin",
-        password="password",  # Set your MySQL password
+        password="password",  #
         database="dbserial"
     )
     cursor = dbConn.cursor()
@@ -16,9 +15,7 @@ except mysql.connector.Error as err:
     print(f"Could not connect to database: {err}")
     sys.exit(1)
 
-device = '/dev/ttyUSB0'  # Update for Raspberry Pi
-
-# Establishing a connection to the Arduino
+device = '/dev/ttyUSB0'  
 try:
     print("Trying...", device)
     arduino = serial.Serial(device, 9600)

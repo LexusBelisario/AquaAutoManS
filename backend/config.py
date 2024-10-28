@@ -3,8 +3,6 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy import text
 from datetime import datetime, timedelta
-import cv2
-from ultralytics import YOLO
 import threading
 import logging
 import time
@@ -106,7 +104,6 @@ def get_temperature_data():
 @app.route('/weekly-temperature-data', methods=['GET'])
 def get_weekly_temperature_data():
     try:
-        # Get the filter type from query parameters (default is 'weekly')
         filter_type = request.args.get('filter', 'weekly')
         
         today = datetime.utcnow()
@@ -124,16 +121,14 @@ def get_weekly_temperature_data():
             records = [dict(zip(columns, row)) for row in result]
 
             if filter_type == '3hours':
-                # Filter the data to show every 3 hours
                 filtered_records = []
                 for record in records:
                     time_data = record['timeData']
                     hour = time_data.hour
-                    if hour % 3 == 0:  # Select data points at 3-hour intervals
+                    if hour % 3 == 0: 
                         filtered_records.append(record)
                 return jsonify(filtered_records)
             else:
-                # Default to weekly data
                 return jsonify(records)
     except Exception as e:
         print(f"Error fetching weekly temperature data: {e}")
@@ -142,7 +137,6 @@ def get_weekly_temperature_data():
 @app.route('/weekly-oxygen-data', methods=['GET'])
 def get_weekly_oxygen_data():
     try:
-        # Get the filter type from query parameters (default is 'weekly')
         filter_type = request.args.get('filter', 'weekly')
 
         today = datetime.utcnow()
@@ -160,16 +154,14 @@ def get_weekly_oxygen_data():
             records = [dict(zip(columns, row)) for row in result]
 
             if filter_type == '3hours':
-                # Filter the data to show every 3 hours
                 filtered_records = []
                 for record in records:
                     time_data = record['timeData']
                     hour = time_data.hour
-                    if hour % 3 == 0:  # Select data points at 3-hour intervals
+                    if hour % 3 == 0: 
                         filtered_records.append(record)
                 return jsonify(filtered_records)
             else:
-                # Default to weekly data
                 return jsonify(records)
     except Exception as e:
         print(f"Error fetching weekly oxygen data: {e}")
@@ -179,7 +171,6 @@ def get_weekly_oxygen_data():
 @app.route('/weekly-ph-data', methods=['GET'])
 def get_weekly_phlevel_data():
     try:
-        # Get the filter type from query parameters (default is 'weekly')
         filter_type = request.args.get('filter', 'weekly')
 
         today = datetime.utcnow()
@@ -197,38 +188,19 @@ def get_weekly_phlevel_data():
             records = [dict(zip(columns, row)) for row in result]
 
             if filter_type == '3hours':
-                # Filter the data to show every 3 hours
                 filtered_records = []
                 for record in records:
                     time_data = record['timeData']
                     hour = time_data.hour
-                    if hour % 3 == 0:  # Select data points at 3-hour intervals
+                    if hour % 3 == 0:  
                         filtered_records.append(record)
                 return jsonify(filtered_records)
             else:
-                # Default to weekly data
                 return jsonify(records)
     except Exception as e:
         print(f"Error fetching weekly oxygen data: {e}")
         return jsonify({'error': str(e)})
     
-
-if __name__ == "__main__":
-    app.run(debug=True)
-    
-modelll = YOLO('C:/Users/user/AquaAutoManS/machine_learning/weights/best.pt')
-
-frame_queue = []
-sensor_data = {}
-
-def read_frames(camera):
-    while True:
-        success, frame = camera.read()
-        if not success:
-            break
-        frame = cv2.resize(frame, (640, 480))
-        frame_queue.append(frame)
-        
 @app.route('/update_sensor_data', methods=['POST'])
 def update_sensor_data():
     global sensor_data
@@ -242,144 +214,25 @@ def update_sensor_data():
     logging.debug(f"Updated sensor data: {sensor_data}")
     return jsonify({'status': 'success'})
 
-
-@app.route('/camera_feed', methods=['GET'])
-def camera_feed():
-    # Try to initialize the Raspberry Pi camera
+@app.route('/update_detection', methods=['POST'])
+def update_detection():
     try:
-        pi_camera = cv2.VideoCapture(0)  # Replace with appropriate ID for the Pi camera
-        if pi_camera.isOpened():
-            return Response(generate_frames(pi_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
-    except Exception as e:
-        print("Error opening Raspberry Pi camera:", e)
+        data = request.json
+        catfish_count = data.get('catfish', 1)
+        dead_catfish_count = data.get('dead_catfish', 0)
 
-    # If Pi camera fails, try to initialize the IP camera
-    camera_url = 'http://192.168.18.137:8080/video'
-    ip_camera = cv2.VideoCapture(camera_url)
-
-    if not ip_camera.isOpened():
-        return jsonify({'error': 'No cameras available'}), 404
-
-    return Response(generate_frames(ip_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-def generate_frames(camera):
-    while True:
-        success, frame = camera.read()
-        if not success:
-            break
-        frame = cv2.resize(frame, (640, 480))  # Adjust frame size as needed
-        ret, buffer = cv2.imencode('.jpg', frame)
-        if not ret:
-            continue
-        frame = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-
-def generate_frames():
-    camera_url = 'http://192.168.18.137:8080/video'
-    camera = cv2.VideoCapture(camera_url)
-
-    if not camera.isOpened():
-        print("Error: Could not open IP camera.")
-        return
-
-    fps = 30
-    frame_interval = 3 / fps
-    last_detection_time = time.time()
-
-    while True:
-        start_time = time.time()
-        
-        success, frame = camera.read()
-        if not success:
-            break
-        frame = cv2.resize(frame, (320, 320))
-        
-        current_time = time.time()
-        elapsed_time = current_time - last_detection_time
-
-        if elapsed_time >= 2.0:
-            results = modelll(frame)
-
-            catfish_count = 0
-            dead_catfish_count = 0
-
-            conf_threshold = 0.5
-            for result in results:
-                boxes = result.boxes
-                if boxes is not None:
-                    for box in boxes:
-                        conf = box.conf[0]
-                        if conf > conf_threshold:
-                            x1, y1, x2, y2 = map(int, box.xyxy[0])
-                            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                            label = result.names[int(box.cls[0])]
-                            text = f"{label}: {conf:.2f}"
-                            cv2.putText(frame, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-                            if label == 'catfish':
-                                catfish_count += 1
-                            elif label == 'dead_catfish':
-                                dead_catfish_count += 1
-
-            # Fetch latest sensor data if missing
-            if all(value is None for value in sensor_data.values()):
-                # Query latest sensor data if it hasn't been updated yet
-                latest_record = aquamans.query.order_by(aquamans.id.desc()).first()
-                if latest_record:
-                    sensor_data['temperature'] = latest_record.temperature
-                    sensor_data['oxygen'] = latest_record.oxygen
-                    sensor_data['phlevel'] = latest_record.phlevel
-                    sensor_data['turbidity'] = latest_record.turbidity
-
-            if all(value is not None for value in sensor_data.values()):
-                try:
-                    with app.app_context():
-                        new_record = aquamans(
-                            temperature=sensor_data.get('temperature'),
-                            oxygen=sensor_data.get('oxygen'),
-                            phlevel=sensor_data.get('phlevel'),
-                            turbidity=sensor_data.get('turbidity'),
-                            catfish=catfish_count,
-                            dead_catfish=dead_catfish_count,
-                            timeData=datetime.utcnow()
-                        )
-                        db.session.add(new_record)
-                        db.session.commit()
-                except Exception as e:
-                    logging.error(f"Error updating data: {e}")
-
-            last_detection_time = current_time
-        
-        ret, buffer = cv2.imencode('.jpg', frame)
-        if not ret:
-            continue
-        frame = buffer.tobytes()
-
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-        # Ensure we process at least 10 fps
-        processing_time = time.time() - start_time
-        if processing_time < frame_interval:
-            time.sleep(frame_interval - processing_time)
-
-@app.route('/video_feed')
-def video_feed():
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-@app.route('/catfish', methods=['GET'])
-def get_catfish():
-    try:
         latest_record = aquamans.query.order_by(aquamans.id.desc()).first()
         if latest_record:
-            return jsonify({'catfish': latest_record.catfish, 'dead_catfish': latest_record.dead_catfish})
+            latest_record.catfish = catfish_count
+            latest_record.dead_catfish = dead_catfish_count
+            db.session.commit()
+            return jsonify({'status': 'success', 'message': 'Detection data updated'})
         else:
-            return jsonify({'catfish': 'N/A', 'dead_catfish': 'N/A'})
+            return jsonify({'status': 'failure', 'message': 'No record to update'})
     except Exception as e:
-        print(f"Error fetching catfish data: {e}")
-        return jsonify({'error': str(e)})
+        print(f"Error updating detection data: {e}")
+        return jsonify({'status': 'error', 'message': str(e)})
+
 
 if __name__ == '__main__':
     app.run(debug=True)
