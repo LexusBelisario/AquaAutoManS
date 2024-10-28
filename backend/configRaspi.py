@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.DEBUG)
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/dbserial'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://admin:password@localhost/dbserial'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -214,5 +214,23 @@ def update_sensor_data():
     logging.debug(f"Updated sensor data: {sensor_data}")
     return jsonify({'status': 'success'})
 
+@app.route('/update_detection', methods=['POST'])
+def update_detection():
+    try:
+        data = request.json
+        catfish_count = data.get('catfish', 1)
+        dead_catfish_count = data.get('dead_catfish', 0)
+
+        latest_record = aquamans.query.order_by(aquamans.id.desc()).first()
+        if latest_record:
+            latest_record.catfish = catfish_count
+            latest_record.dead_catfish = dead_catfish_count
+            db.session.commit()
+            return jsonify({'status': 'success', 'message': 'Detection data updated'})
+        else:
+            return jsonify({'status': 'failure', 'message': 'No record to update'})
+    except Exception as e:
+        print(f"Error updating detection data: {e}")
+        return jsonify({'status': 'error', 'message': str(e)})
 if __name__ == '__main__':
     app.run(debug=True)

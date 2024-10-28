@@ -4,7 +4,9 @@ from ultralytics import YOLO
 
 import requests
 
-model = YOLO('C:/Users/user/AquaAutoManS/machine_learning/weights/best.pt')
+model = YOLO('/home/pi/Python/AquaAutoManS/machine_learning/weights/best.pt')
+
+# model = YOLO('C:/Users/user/AquaAutoManS/machine_learning/weights/best.pt')
 camera = cv2.VideoCapture(0)
 
 if not camera.isOpened():

@@ -60,15 +60,15 @@ export default function Homepage({ setAuth }) {
         messages.push("The temperature is too high. Please change the water.");
       }
 
-      if (latestRow.oxygen < 5) {
+      if (latestRow.oxygen < 1) {
         messages.push("The oxygen level is too low. Please change the water.");
       } else if (latestRow.oxygen > 10) {
         messages.push("The oxygen level is too high. Please change the water.");
       }
 
-      if (latestRow.phlevel < 6.5) {
+      if (latestRow.phlevel < 6 && latestRow.phlevel >= 5) {
         messages.push("The pH level is too low. Please change the water.");
-      } else if (latestRow.phlevel > 9) {
+      } else if (latestRow.phlevel > 7) {
         messages.push("The pH level is too high. Please change the water.");
       }
 
