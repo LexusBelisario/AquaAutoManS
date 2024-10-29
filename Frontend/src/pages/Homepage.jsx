@@ -53,7 +53,6 @@ export default function Homepage({ setAuth }) {
     if (data.length > 0) {
       const latestRow = data[data.length - 1];
 
-      // Check for water quality conditions
       if (latestRow.temperature < 20) {
         messages.push("The temperature is too low. Please change the water.");
       } else if (latestRow.temperature > 35) {
@@ -72,10 +71,11 @@ export default function Homepage({ setAuth }) {
         messages.push("The pH level is too high. Please change the water.");
       }
 
+      if (latestRow.turbidity >= 30) {
+        messages.push("The water is cloudy. Please change the water.");
+      }
       if (latestRow.turbidity >= 50) {
-        messages.push(
-          "The water is dirty (turbidity too high). Please change the water."
-        );
+        messages.push("The water is too dirty, Change the water Immediately!");
       }
 
       // Check catfish detection
