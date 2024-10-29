@@ -3,8 +3,10 @@ import time
 import mysql.connector
 from ultralytics import YOLO
 
-# Load your trained YOLOv8 model
-model = YOLO('C:/Users/user/AquaAutoManS/machine_learning/weights/best.pt')
+# Model Loader for Rasp Pi
+model = YOLO('/home/pi/Python/AquaAutoManS/machine_learning/weights/best.pt')
+# Load your trained YOLOv8 model (Computer)
+# model = YOLO('C:/Users/user/AquaAutoManS/machine_learning/weights/best.pt')
 
 # Set up the Raspberry Pi camera (use '0' or '/dev/video0' for the Pi Camera)
 camera = cv2.VideoCapture(0)
