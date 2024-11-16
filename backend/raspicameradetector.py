@@ -2,25 +2,22 @@ import cv2
 import time
 import mysql.connector
 from ultralytics import YOLO
+# Or if you're running on a different system, specify the path to your model
+model = YOLO('C:/Users/user/AquaAutoManS/machine_learning/weights/best.pt')
 
-# Model Loader for Rasp Pi
-model = YOLO('/home/pi/Python/AquaAutoManS/machine_learning/weights/best.pt')
-# Load your trained YOLOv8 model (Computer)
-# model = YOLO('C:/Users/user/AquaAutoManS/machine_learning/weights/best.pt')
-
-# Set up the Raspberry Pi camera (use '0' or '/dev/video0' for the Pi Camera)
+# Set up the USB camera (use '0' for the primary USB camera or adjust as needed)
 camera = cv2.VideoCapture(0)
 
 # Check if the camera opened successfully
 if not camera.isOpened():
-    print("Error: Could not open Raspberry Pi camera.")
+    print("Error: Could not open USB camera.")
     exit()
 
 # Connect to the MySQL database
 db_connection = mysql.connector.connect(
     host="localhost",
-    user="admin",
-    password="password",
+    user="root",
+    password="",
     database="dbserial"
 )
 db_cursor = db_connection.cursor()
@@ -34,7 +31,7 @@ resize_factor = 0.5
 while True:
     ret, frame = camera.read()
     if not ret:
-        print("Error: Could not read frame from Raspberry Pi camera.")
+        print("Error: Could not read frame from USB camera.")
         break
 
     height, width = frame.shape[:2]
@@ -59,8 +56,8 @@ while True:
                     label = result.names[cls]
 
                     # Insert detection result into the database
-                    if label in ["catfish", "dead_catfish"]:
-                        sql = "INSERT INTO detections (label, confidence, x1, y1, x2, y2, detected_at) VALUES (%s, %s, %s, %s, %s, %s, NOW())"
+                    if label == "catfish":
+                        sql = "INSERT INTO aquamans (label, confidence, x1, y1, x2, y2, detected_at) VALUES (%s, %s, %s, %s, %s, %s, NOW())"
                         values = (label, float(conf), x1, y1, x2, y2)
                         db_cursor.execute(sql, values)
                         db_connection.commit()

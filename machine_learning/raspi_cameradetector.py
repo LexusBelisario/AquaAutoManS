@@ -5,24 +5,24 @@ from ultralytics import YOLO
 # Load your trained YOLOv8 model
 model = YOLO('C:/Users/user/AquaAutoManS/machine_learning/weights/best.pt')
 
-# Set up the Raspberry Pi camera (use '0' or '/dev/video0' for the Pi Camera)
-camera = cv2.VideoCapture(0)
+# Set up the USB Webcam (use '0' or '1' depending on which camera is assigned to the USB webcam)
+camera = cv2.VideoCapture(0)  # Change index to '1' if you have multiple cameras and this doesn't work
 
 # Check if the camera opened successfully
 if not camera.isOpened():
-    print("Error: Could not open Raspberry Pi camera.")
+    print("Error: Could not open USB webcam.")
     exit()
 
 fps = 0
 prev_time = time.time()
 
-confidence_threshold = 0.3
+confidence_threshold = 0.7
 resize_factor = 0.5
 
 while True:
     ret, frame = camera.read()
     if not ret:
-        print("Error: Could not read frame from Raspberry Pi camera.")
+        print("Error: Could not read frame from USB webcam.")
         break
 
     height, width = frame.shape[:2]
@@ -34,7 +34,8 @@ while True:
         prev_time = curr_time
 
     # Run YOLOv8 model inference
-    results = model(frame_resized)
+    results = model(frame_resized, conf=confidence_threshold, iou=0.4, agnostic_nms=True)  # Adjust the iou as needed
+
 
     for result in results:
         boxes = result.boxes
