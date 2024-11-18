@@ -218,20 +218,32 @@ def update_sensor_data():
 def update_detection():
     try:
         data = request.json
-        catfish_count = data.get('catfish', 1)
+        catfish_count = data.get('catfish', 0)
         dead_catfish_count = data.get('dead_catfish', 0)
 
+        # Fetch the latest record
         latest_record = aquamans.query.order_by(aquamans.id.desc()).first()
+
         if latest_record:
-            latest_record.catfish = catfish_count
-            latest_record.dead_catfish = dead_catfish_count
+            # Update the record explicitly using its ID
+            result = db.session.query(aquamans).filter_by(id=latest_record.id).update({
+                "catfish": catfish_count,
+                "dead_catfish": dead_catfish_count
+            }, synchronize_session=False)  # Ensures updates happen even if data hasn't changed
+
+            # Commit the changes
             db.session.commit()
-            return jsonify({'status': 'success', 'message': 'Detection data updated'})
+
+            if result > 0:
+                return jsonify({'status': 'success', 'message': 'Detection data updated'})
+            else:
+                return jsonify({'status': 'failure', 'message': 'No rows were updated'})
         else:
             return jsonify({'status': 'failure', 'message': 'No record to update'})
     except Exception as e:
         print(f"Error updating detection data: {e}")
         return jsonify({'status': 'error', 'message': str(e)})
+
 
 
 if __name__ == '__main__':

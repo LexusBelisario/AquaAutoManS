@@ -16,7 +16,7 @@ if not camera.isOpened():
 fps = 0
 prev_time = time.time()
 
-confidence_threshold = 0.3
+confidence_threshold = 0.7
 
 
 resize_factor = 0.5

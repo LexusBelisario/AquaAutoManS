@@ -5,7 +5,6 @@ from ultralytics import YOLO
 # Load your trained YOLOv8 model
 model = YOLO('C:/Users/user/AquaAutoManS/machine_learning/weights/best.pt')
 
-# Set up the USB Webcam (use '0' or '1' depending on which camera is assigned to the USB webcam)
 camera = cv2.VideoCapture(0)  # Change index to '1' if you have multiple cameras and this doesn't work
 
 # Check if the camera opened successfully
