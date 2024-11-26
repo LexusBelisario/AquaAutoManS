@@ -21,79 +21,38 @@ export default function Homepage({ setAuth }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/data");
-        const data = response.data;
-        updateCatfishCounts(data);
-        checkWaterConditions(data);
+        // Fetch the alert for dead catfish detection from the backend
+        const response = await axios.get(
+          "http://localhost:5000/check_dead_catfish"
+        );
+
+        // Check if there is an alert message from the backend
+        if (response.data.alert) {
+          // Add the alert to the alerts state
+          setAlerts((prevAlerts) => {
+            const newAlert = {
+              message: response.data.alert,
+              details: response.data.details,
+            };
+            // Prevent duplicate alerts
+            return prevAlerts.some(
+              (alert) => alert.message === newAlert.message
+            )
+              ? prevAlerts
+              : [...prevAlerts, newAlert];
+          });
+        }
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching dead catfish alert:", error);
       }
     };
 
     fetchData();
-    const intervalId = setInterval(fetchData, 5000);
+    const intervalId = setInterval(fetchData, 5000); // Check every 5 seconds
     return () => clearInterval(intervalId);
   }, []);
-
-  const updateCatfishCounts = (data) => {
-    if (data.length > 0) {
-      const latestRow = data[data.length - 1];
-      setCatfishCounts({
-        alive: latestRow.catfish,
-        dead: latestRow.dead_catfish,
-      });
-    } else {
-      setCatfishCounts({ alive: 0, dead: 0 });
-    }
-  };
-
-  const checkWaterConditions = (data) => {
-    let messages = [];
-
-    if (data.length > 0) {
-      const latestRow = data[data.length - 1];
-
-      if (latestRow.temperature < 20) {
-        messages.push("The temperature is too low. Please change the water.");
-      } else if (latestRow.temperature > 35) {
-        messages.push("The temperature is too high. Please change the water.");
-      }
-
-      if (latestRow.oxygen < 1) {
-        messages.push("The oxygen level is too low. Please change the water.");
-      } else if (latestRow.oxygen > 10) {
-        messages.push("The oxygen level is too high. Please change the water.");
-      }
-
-      if (latestRow.phlevel < 6 && latestRow.phlevel >= 5) {
-        messages.push("The pH level is too low. Please change the water.");
-      } else if (latestRow.phlevel > 7) {
-        messages.push("The pH level is too high. Please change the water.");
-      }
-
-      if (latestRow.turbidity >= 30) {
-        messages.push("The water is cloudy. Please change the water.");
-      }
-      if (latestRow.turbidity >= 50) {
-        messages.push("The water is too dirty, Change the water Immediately!");
-      }
-
-      // Check catfish detection
-      if (latestRow.catfish === 0 && latestRow.dead_catfish === 0) {
-        messages.push("No catfish detected in the system.");
-      } else {
-        if (latestRow.catfish > 0) {
-          messages.push(`${latestRow.catfish} alive catfish detected.`);
-        }
-        if (latestRow.dead_catfish > 0) {
-          messages.push(`${latestRow.dead_catfish} dead catfish detected.`);
-        }
-      }
-
-      setAlerts(messages);
-    } else {
-      setAlerts(["No data available."]);
-    }
+  const removeAlert = (index) => {
+    setAlerts((prevAlerts) => prevAlerts.filter((_, i) => i !== index));
   };
 
   return (
@@ -135,7 +94,7 @@ export default function Homepage({ setAuth }) {
           {/* Alert Box */}
           <div>
             <p className="text-2xl font-bold mb-4">Alert Notifications</p>
-            <AlertBox alerts={alerts} />
+            <AlertBox alerts={alerts} removeAlert={removeAlert} />
           </div>
 
           {/* Graph Components */}
