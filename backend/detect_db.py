@@ -19,7 +19,7 @@ db_config = {
 }
 
 # Path to the YOLOv8 model weights
-model = YOLO("C:/Users/user/AquaAutoManS/machine_learning/weights/best.pt")  # Adjust the path for your system
+model = YOLO("C:/Users/ADMIN/AquaAutoManS/machine_learning/weights/best3.pt")  # Adjust the path for your system
 
 class_names = ["catfish", "dead_catfish"]
 recent_detections = {"catfish": [], "dead_catfish": []}
@@ -46,7 +46,7 @@ while True:
         break
 
     # Perform prediction
-    results = model.predict(frame, conf=0.5, iou=0.5)
+    results = model.predict(frame, conf=0.25, iou=0.4)
     catfish_count = 0
     dead_catfish_count = 0
 
