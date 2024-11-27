@@ -59,6 +59,11 @@ while True:
             # Filter small detections
             if (x2 - x1) < 20 or (y2 - y1) < 20:
                 continue
+            
+            label = f"{class_names[cls]} {conf:.2f}"
+            color = (0, 255, 0) if cls == 0 else (0, 0, 255)  # Green for catfish, Red for dead catfish
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)  # Draw rectangle
+            cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
             if cls == 0:  # catfish
                 catfish_count += 1
@@ -70,7 +75,7 @@ while True:
                 # Check if 5 minutes have passed since the last capture
                 current_time = datetime.now()
                 if last_capture_time is None or (current_time - last_capture_time).total_seconds() >= 20:
-                    # Capture new image every 5 minutes
+                    # Capture new image every 20 seconds
                     last_capture_time = current_time  # Update the last capture time
 
                     # Convert the frame to image and encode to binary (for uploading)
@@ -103,11 +108,19 @@ while True:
                     except mysql.connector.Error as e:
                         print(f"Error uploading to MySQL: {e}")
 
-            # Draw bounding box and label
-            label = f"{class_names[cls]} {conf:.2f}"
-            color = (0, 255, 0) if cls == 0 else (0, 0, 255)
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-            cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+    # Send the catfish and dead catfish counts to Flask backend
+    data = {
+        'catfish': catfish_count,
+        'dead_catfish': dead_catfish_count
+    }
+    try:
+        response = requests.post(FLASK_API_URL, json=data)
+        if response.status_code == 200:
+            print(f"Detection data sent to Flask API: {data}")
+        else:
+            print(f"Failed to send detection data to Flask API. Status Code: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        print(f"Error sending data to Flask API: {e}")
 
     recent_detections["catfish"].append(catfish_count)
     recent_detections["dead_catfish"].append(dead_catfish_count)

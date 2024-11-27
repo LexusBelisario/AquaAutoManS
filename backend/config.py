@@ -37,7 +37,7 @@ class aquamans(db.Model):
     catfish = db.Column(db.Float, default=0)
     dead_catfish = db.Column(db.Float, default=0)
     timeData = db.Column(db.DateTime, default=datetime.utcnow)
-    dead_catfish_image = db.Column(db.LargeBinary)
+    dead_catfish_image = db.Column(db.LargeBinary, nullable=True)
 
 @app.route('/temperature', methods=['GET'])
 def get_temperature():
@@ -100,7 +100,13 @@ def get_data():
         with db.engine.connect() as connection:
             result = connection.execute(text("SELECT * FROM aquamans"))
             columns = result.keys()
-            records = [dict(zip(columns, row)) for row in result]
+            records = []
+            for row in result:
+                record = dict(zip(columns, row))
+                # Encode binary data to base64 if present
+                if record.get('dead_catfish_image'):
+                    record['dead_catfish_image'] = base64.b64encode(record['dead_catfish_image']).decode('utf-8')
+                records.append(record)
             return jsonify(records)
     except Exception as e:
         print(f"Error fetching data: {e}")
@@ -246,7 +252,7 @@ def update_detection():
         data = request.json
         catfish_count = int(data.get('catfish', 0))
         dead_catfish_count = int(data.get('dead_catfish', 0))
-        
+
         # Fetch the latest record
         latest_record = aquamans.query.order_by(aquamans.id.desc()).first()
         if latest_record:
@@ -260,6 +266,7 @@ def update_detection():
     except Exception as e:
         logging.error(f"Error updating detection data: {e}")
         return jsonify({'status': 'error', 'message': str(e)})
+
 
     
 @app.route('/check_dead_catfish', methods=['GET'])
@@ -405,7 +412,7 @@ def print_dead_catfish_report():
         if total_catfish == 0:
             mortality_rate = 0
         else:
-            mortality_rate = (total_dead_catfish / total_catfish) * 100  # Calculate mortality rate as a percentage
+            mortality_rate = (total_dead_catfish / 5) * 100  # Calculate mortality rate as a percentage
 
         # Tallied Results
         temperature = latest_dead_record.temperature
