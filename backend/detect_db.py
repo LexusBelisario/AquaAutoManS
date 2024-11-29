@@ -4,9 +4,9 @@ import base64
 from io import BytesIO
 from PIL import Image
 from ultralytics import YOLO
-from datetime import datetime
+from datetime import datetime, timedelta
 import mysql.connector
-import time  # Import time module
+import time
 
 FLASK_API_URL = "http://127.0.0.1:5000/update_detection"
 
@@ -19,7 +19,7 @@ db_config = {
 }
 
 # Path to the YOLOv8 model weights
-model = YOLO("C:/Users/ADMIN/AquaAutoManS/machine_learning/weights/best3.pt")  # Adjust the path for your system
+model = YOLO("C:/Users/ADMIN/AquaAutoManS/machine_learning/weights/best1.pt")  # Adjust the path for your system
 
 class_names = ["catfish", "dead_catfish"]
 recent_detections = {"catfish": [], "dead_catfish": []}
@@ -39,14 +39,24 @@ def get_db_connection():
     return connection
 
 print("Press 'q' to exit the detection.")
+
+# Timer variables
+start_time = datetime.now()
+
 while True:
+    elapsed_time = datetime.now() - start_time
+    if elapsed_time >= timedelta(hours=1):  # Check if 1 hour has passed
+        print("Resting for 5 minutes to prevent overheating...")
+        time.sleep(300)  # Rest for 5 minutes (300 seconds)
+        start_time = datetime.now()  # Reset the start time
+
     ret, frame = cap.read()
     if not ret:
         print("Error: Failed to capture frame.")
         break
 
     # Perform prediction
-    results = model.predict(frame, conf=0.25, iou=0.4)
+    results = model.predict(frame, conf=0.5, iou=0.4)
     catfish_count = 0
     dead_catfish_count = 0
 

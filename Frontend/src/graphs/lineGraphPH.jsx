@@ -33,12 +33,8 @@ export const LineGraphPH = () => {
           `http://127.0.0.1:5000/weekly-ph-data?filter=${filter}`
         );
         const data = await response.json();
-
         console.log("Fetched data:", data);
-
-        const processedData = processPhData(data);
-
-        setPhData(processedData);
+        setPhData(processPhData(data));
         setLoading(false);
       } catch (error) {
         console.error("Error fetching pH data:", error);
@@ -49,68 +45,50 @@ export const LineGraphPH = () => {
   }, [filter]); // refetch data when filter changes
 
   const processPhData = (data) => {
-    const labels =
-      filter === "3hours"
-        ? []
-        : [
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-            "Sunday",
-          ];
-    const phLevels =
-      filter === "3hours" ? [] : [50, 40, 30, 20, 10, 0].map(() => []);
+    const labels = [];
+    const phLevels = [];
 
-    const dailyPhLevels = Array(7)
-      .fill(0)
-      .map(() => []);
+    if (filter === "3hours") {
+      data.forEach((entry) => {
+        const date = new Date(entry.timeData);
+        labels.push(`${date.getHours()}:00 ${date.toLocaleDateString()}`);
+        phLevels.push(entry.phlevel);
+      });
+    } else {
+      const dailyPhLevels = Array(7)
+        .fill(0)
+        .map(() => []);
 
-    data.forEach((entry) => {
-      const date = new Date(entry.timeData);
-      const phLevel = entry.ph_level;
-
-      if (filter === "3hours") {
-        const timeLabel = `${date.getHours()}:00 ${date.toLocaleDateString()}`;
-        labels.push(timeLabel);
-        phLevels.push(phLevel);
-      } else {
+      data.forEach((entry) => {
+        const date = new Date(entry.timeData);
+        const phLevel = entry.phlevel;
         const dayIndex = date.getDay();
-        if (dayIndex >= 1) {
-          dailyPhLevels[dayIndex - 1].push(phLevel);
-        }
-      }
-    });
+        dailyPhLevels[dayIndex].push(phLevel);
+      });
 
-    const avgPhLevels = dailyPhLevels.map((phArray) => {
-      if (phArray.length === 0) return 0;
-      return (
-        phArray.reduce((sum, phLevel) => sum + phLevel, 0) / phArray.length
+      const avgPhLevels = dailyPhLevels.map((phArray) => {
+        if (phArray.length === 0) return 0;
+        return phArray.reduce((sum, ph) => sum + ph, 0) / phArray.length;
+      });
+
+      labels.push(
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday"
       );
-    });
+      phLevels.push(...avgPhLevels);
+    }
 
     return {
-      labels:
-        filter === "3hours"
-          ? labels
-          : [
-              "Monday",
-              "Tuesday",
-              "Wednesday",
-              "Thursday",
-              "Friday",
-              "Saturday",
-              "Sunday",
-            ],
+      labels,
       datasets: [
         {
-          label:
-            filter === "3hours"
-              ? "pH Levels Every 3 Hours"
-              : "Average pH Levels",
-          data: filter === "3hours" ? phLevels : avgPhLevels,
+          label: filter === "3hours" ? "pH Levels (3-hour intervals)" : "Weekly pH Levels",
+          data: phLevels,
           fill: false,
           borderColor: "purple",
           tension: 0.1,
@@ -127,8 +105,7 @@ export const LineGraphPH = () => {
       },
       title: {
         display: true,
-        text:
-          filter === "3hours" ? "pH Levels Every 3 Hours" : "Weekly pH Levels",
+        text: filter === "3hours" ? "pH Levels Every 3 Hours" : "Weekly pH Levels",
       },
     },
   };

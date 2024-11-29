@@ -20,6 +20,7 @@ logging.basicConfig(level=logging.DEBUG)
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
+
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/dbserial'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
@@ -38,6 +39,7 @@ class aquamans(db.Model):
     dead_catfish = db.Column(db.Float, default=0)
     timeData = db.Column(db.DateTime, default=datetime.utcnow)
     dead_catfish_image = db.Column(db.LargeBinary, nullable=True)
+
 
 @app.route('/temperature', methods=['GET'])
 def get_temperature():
@@ -210,19 +212,19 @@ def get_weekly_phlevel_data():
             columns = result.keys()
             records = [dict(zip(columns, row)) for row in result]
 
-            if filter_type == '3hours':
-                filtered_records = []
-                for record in records:
-                    time_data = record['timeData']
-                    hour = time_data.hour
-                    if hour % 3 == 0:  
-                        filtered_records.append(record)
-                return jsonify(filtered_records)
-            else:
-                return jsonify(records)
+        if filter_type == '3hours':
+            filtered_records = [
+                record for record in records
+                if datetime.fromisoformat(record['timeData']).hour % 3 == 0
+            ]
+            return jsonify(filtered_records)
+        else:
+            return jsonify(records)
+
     except Exception as e:
-        print(f"Error fetching weekly oxygen data: {e}")
+        print(f"Error fetching weekly pH data: {e}")
         return jsonify({'error': str(e)})
+
     
 @app.route('/update_sensor_data', methods=['POST'])
 def update_sensor_data():
@@ -272,117 +274,140 @@ def update_detection():
 @app.route('/check_dead_catfish', methods=['GET'])
 def check_dead_catfish():
     try:
-        # Fetch all records where dead_catfish is greater than 0
-        dead_catfish_records = aquamans.query.filter(aquamans.dead_catfish > 0).order_by(aquamans.timeData.desc()).all()
+        # Fetch the last 10 records to analyze consecutive dead_catfish detections
+        recent_records = (
+            aquamans.query.order_by(aquamans.timeData.desc())
+            .limit(10)
+            .all()
+        )
 
-        # If no dead catfish records found, return a message
-        if not dead_catfish_records:
-            # Return the latest non-dead catfish sensor data
-            latest_record = aquamans.query.order_by(aquamans.id.desc()).first()
-            if latest_record:
-                return jsonify({
-                    'message': 'No dead catfish detected in the system.',
-                    'latest_data': {
-                        'temperature': latest_record.temperature,
-                        'oxygen': latest_record.oxygen,
-                        'phlevel': latest_record.phlevel,
-                        'turbidity': latest_record.turbidity
-                    }
-                })
+        if not recent_records:
+            return jsonify({
+                'message': 'No data available in the system.',
+            })
 
-        # Get the most recent dead catfish record
-        latest_record = dead_catfish_records[0]
+        # Check for consecutive dead_catfish detections
+        consecutive_count = 0
+        latest_record = None
 
-        # Determine possible causes based on temperature, oxygen, and pH level
-        possible_causes = []
-        
-        # Temperature conditions
-        if 26 <= latest_record.temperature <= 32:
-            temperature_status = "The Water had a Normal Temperature"
-        elif 20 < latest_record.temperature < 26:
-            temperature_status = "The Water had a Below Average Temperature"
-        elif latest_record.temperature <= 20:
-            temperature_status = "The Water had a Cold Temperature"
-        elif 26 < latest_record.temperature < 35:
-            temperature_status = "The Water had an Above Average Temperature"
-        elif latest_record.temperature >= 35:
-            temperature_status = "The Water had a Hot Temperature"
-        
-        # Oxygen conditions
-        if latest_record.oxygen == 0:
-            oxygen_status = "The Water had a Very Low Oxygen"
-        elif latest_record.oxygen < 1.5:
-            oxygen_status = "The Water had a Low Oxygen"
-        elif 1.5 <= latest_record.oxygen <= 5:
-            oxygen_status = "The Water had a Normal Oxygen"
-        else:
-            oxygen_status = "The Water had a High Oxygen"
-        
-        # pH level conditions
-        if latest_record.phlevel < 4:
-            ph_status = "The Water was Very Acidic"
-        elif 4 <= latest_record.phlevel < 6:
-            ph_status = "The Water was Acidic"
-        elif 6 <= latest_record.phlevel <= 7.5:
-            ph_status = "The Water was Normal pH Level"
-        elif 7 < latest_record.phlevel <= 9:
-            ph_status = "The Water was Very Alkaline"
-        
-        # Add to the possible causes based on detected conditions (excluding normal conditions)
-        if temperature_status != "The Water had a Normal Temperature":
-            possible_causes.append(temperature_status)
-        if oxygen_status != "The Water had a Normal Oxygen":
-            possible_causes.append(oxygen_status)
-        if ph_status != "The Water was Normal pH Level":
-            possible_causes.append(ph_status)
+        for record in recent_records:
+            if record.dead_catfish > 0:
+                consecutive_count += 1
+                latest_record = record
+            else:
+                # Reset the counter if a zero value is encountered
+                consecutive_count = 0
 
-        # Construct the possible causes message
-        possible_causes_message = "The system detected that: " + " and that: ".join(possible_causes) + " volume(s). These are the high probable causes of death for catfishes."
+            # If we reach 5 consecutive detections, confirm a dead catfish
+            if consecutive_count >= 5:
+                break
 
-        # Structure the message to include detailed information about the dead catfish event
-        message = {
-            "alert": "A catfish has died! Please remove it immediately.",
-            "details": {
-                "temperature": latest_record.temperature,
-                "temperature_status": temperature_status,
-                "oxygen": latest_record.oxygen,
-                "oxygen_status": oxygen_status,
-                "phlevel": latest_record.phlevel,
-                "phlevel_status": ph_status,
-                "turbidity": latest_record.turbidity,
-                "turbidity_status": latest_record.turbidityResult,
-                "dead_catfish_count": latest_record.dead_catfish,
-                "time_detected": latest_record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
-                "note": "Remove the dead catfish immediately to avoid water contamination.",
-                "possible_causes": possible_causes_message,
-            },
-        }
-        logging.warning(f"Dead catfish detected: {message}")
-        return jsonify(message)
+        # If a dead catfish is confirmed, notify the user
+        if consecutive_count >= 5 and latest_record:
+            # Determine possible causes based on temperature, oxygen, and pH level
+            possible_causes = []
+
+            # Temperature conditions
+            if 26 <= latest_record.temperature <= 32:
+                temperature_status = "The Water had a Normal Temperature"
+            elif 20 < latest_record.temperature < 26:
+                temperature_status = "The Water had a Below Average Temperature"
+            elif latest_record.temperature <= 20:
+                temperature_status = "The Water had a Cold Temperature"
+            elif 26 < latest_record.temperature < 35:
+                temperature_status = "The Water had an Above Average Temperature"
+            elif latest_record.temperature >= 35:
+                temperature_status = "The Water had a Hot Temperature"
+
+            # Oxygen conditions
+            if latest_record.oxygen == 0:
+                oxygen_status = "The Water had a Very Low Oxygen"
+            elif latest_record.oxygen < 1.5:
+                oxygen_status = "The Water had a Low Oxygen"
+            elif 1.5 <= latest_record.oxygen <= 5:
+                oxygen_status = "The Water had a Normal Oxygen"
+            else:
+                oxygen_status = "The Water had a High Oxygen"
+
+            # pH level conditions
+            if latest_record.phlevel < 4:
+                ph_status = "The Water was Very Acidic"
+            elif 4 <= latest_record.phlevel < 6:
+                ph_status = "The Water was Acidic"
+            elif 6 <= latest_record.phlevel <= 7.5:
+                ph_status = "The Water was Normal pH Level"
+            elif 7.5 < latest_record.phlevel <= 9:
+                ph_status = "The Water was Very Alkaline"
+
+            # Add to the possible causes based on detected conditions (excluding normal conditions)
+            if temperature_status != "The Water had a Normal Temperature":
+                possible_causes.append(temperature_status)
+            if oxygen_status != "The Water had a Normal Oxygen":
+                possible_causes.append(oxygen_status)
+            if ph_status != "The Water was Normal pH Level":
+                possible_causes.append(ph_status)
+
+            # Construct the possible causes message
+            possible_causes_message = "The system detected that: " + " and that: ".join(possible_causes) + " volume(s). These are the high probable causes of death for catfishes."
+
+            # Structure the response message
+            message = {
+                "alert": "A catfish has died! Please remove it immediately.",
+                "details": {
+                    "temperature": latest_record.temperature,
+                    "temperature_status": temperature_status,
+                    "oxygen": latest_record.oxygen,
+                    "oxygen_status": oxygen_status,
+                    "phlevel": latest_record.phlevel,
+                    "phlevel_status": ph_status,
+                    "turbidity": latest_record.turbidity,
+                    "turbidity_status": latest_record.turbidityResult,
+                    "dead_catfish_count": latest_record.dead_catfish,
+                    "time_detected": latest_record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
+                    "note": "Remove the dead catfish immediately to avoid water contamination.",
+                    "possible_causes": possible_causes_message,
+                },
+            }
+            logging.warning(f"Dead catfish detected 5 or more times consecutively: {message}")
+            return jsonify(message)
+
+        # If no critical dead_catfish event, return a normal message
+        return jsonify({
+            'message': 'No critical dead catfish event detected.',
+            'latest_data': {
+                'temperature': recent_records[0].temperature,
+                'oxygen': recent_records[0].oxygen,
+                'phlevel': recent_records[0].phlevel,
+                'turbidity': recent_records[0].turbidity
+            }
+        })
 
     except Exception as e:
         logging.error(f"Error checking for dead catfish: {e}")
         return jsonify({'error': str(e)})
+
     
 
 @app.route('/check_dead_catfish/print', methods=['GET'])
 def print_dead_catfish_report():
     try:
-        # Fetch the latest dead catfish record
-        latest_dead_record = (
+        # Fetch the last 5 records where dead_catfish is detected
+        recent_records = (
             aquamans.query.filter(aquamans.dead_catfish > 0)
             .order_by(aquamans.timeData.desc())
-            .first()
+            .limit(5)
+            .all()
         )
 
-        if not latest_dead_record:
-            return jsonify({"message": "No dead catfish detected in the system."})
+        if len(recent_records) == 5 and all(record.dead_catfish > 0 for record in recent_records):
+            # Notify user of dead catfish
+            latest_record = recent_records[0]  # Most recent record
 
         # Fetch data from the last 3 hours
-        three_hours_ago = latest_dead_record.timeData - timedelta(hours=3)
+        three_hours_ago = latest_record.timeData - timedelta(hours=3)
         recent_data = (
             aquamans.query.filter(
-                aquamans.timeData.between(three_hours_ago, latest_dead_record.timeData)
+                aquamans.timeData.between(three_hours_ago, latest_record.timeData)
             )
             .order_by(aquamans.timeData)
             .all()
@@ -526,5 +551,6 @@ def print_dead_catfish_report():
         return jsonify({"error": str(e)})
 
     
+
 if __name__ == '__main__':
     app.run(debug=True)
