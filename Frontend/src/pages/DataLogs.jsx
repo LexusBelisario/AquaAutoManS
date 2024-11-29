@@ -142,7 +142,16 @@ export default function DataLogs({ setAuth }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/data");
+        let url = "http://localhost:5000/data"; // Default URL
+
+        // If a date is selected, append it to the URL
+        if (filterDate) {
+          url += `?date=${filterDate}`;
+        }
+
+        const response = await axios.get(url);
+        console.log("Data fetched from backend:", response.data); // Log the full data
+
         setData(response.data);
         applyFilter(response.data);
       } catch (error) {
@@ -150,121 +159,93 @@ export default function DataLogs({ setAuth }) {
       }
     };
 
-    fetchData();
-    const intervalId = setInterval(fetchData, 5000);
-
-    return () => clearInterval(intervalId);
-  }, [filterDate]);
+    fetchData(); // Fetch data when the component mounts
+    const intervalId = setInterval(fetchData, 5000); // Poll every 5 seconds
+    return () => clearInterval(intervalId); // Cleanup on unmount
+  }, [filterDate]); // Trigger fetchData when filterDate changes
 
   const applyFilter = (dataToFilter) => {
     if (filterDate) {
+      // Convert filterDate to the format YYYY-MM-DD (it should already be, but we'll ensure it)
+      const formattedFilterDate = filterDate;
+
       const filtered = dataToFilter.filter((row) => {
+        // Extract the date part only (YYYY-MM-DD) from the full date-time string
         const rowDate = new Date(row.timeData).toISOString().split("T")[0];
-        return rowDate === filterDate;
+
+        // Log for debugging
+        console.log(
+          `Comparing rowDate: ${rowDate} with formattedFilterDate: ${formattedFilterDate}`
+        );
+
+        return rowDate === formattedFilterDate; // Ensure we only compare the date part (YYYY-MM-DD)
       });
-      setFilteredData(filtered);
+      setFilteredData(filtered); // Set the filtered data
     } else {
-      setFilteredData(dataToFilter);
+      setFilteredData(dataToFilter); // Show all data if no date is selected
     }
   };
 
   const handleDateChange = (e) => {
     const selectedDate = e.target.value;
-    setFilterDate(selectedDate);
-    applyFilter(data);
+    setFilterDate(selectedDate); // Update filterDate
+
+    // Force reset of filtered data when a new date is selected
+    setFilteredData([]); // Reset filtered data so it doesn't include outdated data
+
+    if (selectedDate) {
+      applyFilter(data); // Reapply the filter with the new date
+    }
   };
 
   const handlePageChange = (page) => {
-    setCurrentPage(page);
+    setCurrentPage(page); // Update current page
   };
 
   const handleRowsPerPageChange = (newRowsPerPage) => {
-    setRowsPerPage(newRowsPerPage);
+    setRowsPerPage(newRowsPerPage); // Update rows per page
   };
 
-  const handlePrint = () => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    const rowsToPrint = filteredData.slice(startIndex, endIndex);
+  const generateReport = async (filterOption) => {
+    let url = "http://localhost:5000/check_data/print";
+    const today = new Date().toISOString().split("T")[0]; // Get today's date as YYYY-MM-DD
 
-    const printWindow = window.open("", "", "height=600,width=800");
-    printWindow.document.write("<html><head><title>Print Table</title>");
-    printWindow.document.write("</head><body>");
-    printWindow.document.write("<h1>Data Logs</h1>");
-    printWindow.document.write(
-      '<table border="1" style="border-collapse: collapse;">'
-    );
-    printWindow.document.write("<thead><tr>");
+    // For "by_date" filter, check if a date is selected
+    if (filterOption === "by_date" && filterDate) {
+      // Ensure the date is valid and fetch data for that date
+      const response = await axios.get(
+        `http://localhost:5000/data?date=${filterDate}`
+      );
+      if (response.data.length === 0) {
+        alert("No data found for the selected date.");
+        return;
+      }
+      url += `?date=${filterDate}`;
+    } else if (filterOption === "3_hours" && filterDate === today) {
+      // Only apply 3 hours filter if the selected date is today's date
+      url += "?hours=3";
+    } else if (filterOption === "1_hour") {
+      url += "?hours=1";
+    }
 
-    columns.forEach((column) => {
-      printWindow.document.write(`<th>${column.name}</th>`);
-    });
+    // If no date is selected and user tries to generate "by_date" report, show alert
+    if (filterOption === "by_date" && !filterDate) {
+      alert("Please select a date to generate the report.");
+      return;
+    }
 
-    printWindow.document.write("</tr></thead><tbody>");
-    rowsToPrint.forEach((row) => {
-      printWindow.document.write("<tr>");
-      columns.forEach((column) => {
-        const cellData = column.selector(row);
-        let cellColor = "black";
-
-        // Check temperature conditions
-        if (
-          column.name === "Temperature" &&
-          ((row.temperature <= 20 && row.temperature !== 0) ||
-            row.temperature >= 35 ||
-            row.temperature === 0 ||
-            row.temperature < 0 ||
-            (row.temperature >= 20 && row.temperature <= 26) ||
-            (row.temperature >= 32 && row.temperature <= 35))
-        ) {
-          cellColor = "red";
-        }
-        if (
-          column.name === "Temperature Result" &&
-          (row.tempResult === "BelowAverageTemperature" ||
-            row.tempResult === "ColdTemperature" ||
-            row.tempResult === "AboveAverageTemperature" ||
-            row.tempResult === "HotTemperature")
-        ) {
-          cellColor = "red";
-        }
-        // Check oxygen conditions
-        if (
-          column.name === "Oxygen" &&
-          (row.oxygen === 0 || row.oxygen < 1.5 || row.oxygen < 5)
-        ) {
-          cellColor = "red";
-        }
-
-        if (
-          column.name === "Oxygen Result" &&
-          (row.oxygenResult === "VeryLowOxygen" ||
-            row.oxygenResult === "LowOxygen" ||
-            row.oxygenResult === "HighOxygen")
-        ) {
-          cellColor = "red";
-        }
-        // Check pH level conditions
-        if (
-          column.name === "pH Level" &&
-          ((row.phlevel >= 4 && row.phlevel < 6) ||
-            row.phlevel < 4 ||
-            (row.phlevel > 7 && row.phlevel <= 9) ||
-            row.phlevel < 9)
-        ) {
-          cellColor = "red";
-        }
-
-        printWindow.document.write(
-          `<td style="color: ${cellColor}; padding: 8px;">${cellData}</td>`
-        );
-      });
-      printWindow.document.write("</tr>");
-    });
-    printWindow.document.write("</tbody></table>");
-    printWindow.document.write("</body></html>");
-    printWindow.document.close();
-    printWindow.focus();
+    // Generate and download the report
+    try {
+      const response = await axios.get(url, { responseType: "blob" });
+      const file = new Blob([response.data], { type: "application/pdf" });
+      const fileURL = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = fileURL;
+      link.download = "data-report.pdf";
+      link.click();
+    } catch (error) {
+      console.error("Error generating report:", error);
+    }
   };
 
   return (
@@ -290,13 +271,26 @@ export default function DataLogs({ setAuth }) {
             />
           </div>
 
-          <button
-            type="button"
-            className="text-purple-700 hover:text-white border border-purple-700 hover:bg-purple-800 focus:ring-4 focus:outline-none focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center mb-2 dark:border-purple-400 dark:text-purple-400 dark:hover:text-white dark:hover:bg-purple-500 dark:focus:ring-purple-900"
-            onClick={handlePrint}
-          >
-            Print Current Page
-          </button>
+          <div className="mb-4">
+            <button
+              onClick={() => generateReport("3_hours")}
+              className="bg-blue-500 text-white px-4 py-2 rounded mr-2"
+            >
+              Generate 3 Hours Report
+            </button>
+            <button
+              onClick={() => generateReport("1_hour")}
+              className="bg-blue-500 text-white px-4 py-2 rounded mr-2"
+            >
+              Generate 1 Hour Report
+            </button>
+            <button
+              onClick={() => generateReport("by_date")}
+              className="bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              Generate Report By Date
+            </button>
+          </div>
 
           <div id="printable-table">
             <DataTable

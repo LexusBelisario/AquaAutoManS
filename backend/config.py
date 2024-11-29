@@ -10,15 +10,16 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib import colors
 import base64
-import cv2
 import logging
-from detect import model, cap, class_names 
+import threading
+import time
+
+active = True 
 
 logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
-
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/dbserial'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -39,29 +40,22 @@ class aquamans(db.Model):
     timeData = db.Column(db.DateTime, default=datetime.utcnow)
     dead_catfish_image = db.Column(db.LargeBinary, nullable=True)
     
-def generate_frames():
+def periodic_sleep():
+    """
+    Function to sleep for 5 minutes every 1 hour.
+    """
+    global active
     while True:
-        ret, frame = cap.read()
-        if not ret:
-            logging.error("Failed to grab frame from webcam.")
-            break
+        logging.info("System active.")
+        time.sleep(3600 - 300)  # Sleep for 55 minutes
+        logging.info("System will sleep for 5 minutes to prevent overheating.")
+        active = False  # Disable active operations
+        time.sleep(300)  # Sleep for 5 minutes
+        active = True  # Re-enable active operations
+        logging.info("System resumed.")
 
-        results = model.predict(frame, conf=0.5, iou=0.4)
-        for result in results:
-            for box in result.boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-                cls = int(box.cls[0])
-                color = (0, 255, 0) if cls == 0 else (0, 0, 255)
-                label = f"{class_names[cls]} {box.conf[0]:.2f}"
-                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-
-        _, buffer = cv2.imencode('.jpg', frame)
-        frame = buffer.tobytes()
-
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
+sleep_thread = threading.Thread(target=periodic_sleep, daemon=True)
+sleep_thread.start()    
 
 @app.route('/temperature', methods=['GET'])
 def get_temperature():
@@ -118,23 +112,58 @@ def get_turbidity():
         logging.error(f"Error fetching turbidity: {e}")
         return jsonify({'error': str(e)})
 
+from datetime import datetime
+from flask import request, jsonify
+from sqlalchemy import text
+
 @app.route('/data', methods=['GET'])
 def get_data():
     try:
+        # Get the date filter from the request
+        date_filter = request.args.get('date', None)
+        
+        if date_filter:
+            try:
+                # Parse date in 'YYYY-MM-DD' format
+                filter_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
+            except ValueError:
+                return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
+        else:
+            filter_date = None  # No date filter provided
+
         with db.engine.connect() as connection:
-            result = connection.execute(text("SELECT * FROM aquamans"))
-            columns = result.keys()
+            if filter_date:
+                # Filter by exact date (ignore time part of 'timeData')
+                query = """
+                    SELECT * FROM aquamans
+                    WHERE DATE(timeData) = :filter_date
+                """
+                result = connection.execute(text(query), {'filter_date': filter_date})
+            else:
+                query = "SELECT * FROM aquamans"
+                result = connection.execute(text(query))
+
             records = []
             for row in result:
-                record = dict(zip(columns, row))
-                # Encode binary data to base64 if present
-                if record.get('dead_catfish_image'):
-                    record['dead_catfish_image'] = base64.b64encode(record['dead_catfish_image']).decode('utf-8')
+                # Convert rows into a dictionary
+                record = dict(zip(result.keys(), row))
+                
+                # Check for binary data and base64 encode it
+                for key, value in record.items():
+                    if isinstance(value, bytes):
+                        # For binary data (like images or files), encode to base64
+                        record[key] = base64.b64encode(value).decode('utf-8')  # Use base64 encoding
+
                 records.append(record)
+
+            if not records:
+                return jsonify({"message": "No data found for the selected date."}), 404
+
             return jsonify(records)
+
     except Exception as e:
         print(f"Error fetching data: {e}")
-        return jsonify({'error': str(e)})
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/temperature-data', methods=['GET'])
 def get_temperature_data():
@@ -557,31 +586,88 @@ def print_dead_catfish_report():
     except Exception as e:
         logging.error(f"Error generating dead catfish report: {e}")
         return jsonify({"error": str(e)})
-
     
-@app.route('/video_feed', methods=['GET'])
-def video_feed():
-    """Serve real-time video feed."""
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-@app.route('/detection_data', methods=['GET'])
-def detection_data():
-    """Fetch YOLO detection data from the database."""
+@app.route('/check_data/print', methods=['GET'])
+def print_data_report():
     try:
-        latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()
-        if latest_record:
-            data = {
-                'catfish': latest_record.catfish,
-                'dead_catfish': latest_record.dead_catfish,
-                'timeData': latest_record.timeData.isoformat()
-            }
-            return jsonify(data)
+        # Get the time window for filtering from query parameters
+        time_filter = request.args.get('hours', default=0, type=int)  # Default is 0 (no filter)
+
+        # Get the date filter (if provided) or use current time
+        date_filter = request.args.get('date', default=None, type=str)
+
+        # Handle "3_hours" or "1_hour" logic
+        if time_filter > 0:
+            if date_filter:
+                filter_date = datetime.strptime(date_filter, "%Y-%m-%d")
+                if filter_date.date() != datetime.today().date():
+                    return jsonify({"message": "3 hours report only works with today's date."}), 400
+            else:
+                filter_date = datetime.now()
         else:
-            return jsonify({'error': 'No detection data found.'})
-    except Exception as e:
-        logging.error(f"Error fetching detection data: {e}")
-        return jsonify({'error': str(e)})
+            if date_filter:
+                filter_date = datetime.strptime(date_filter, "%Y-%m-%d")
+            else:
+                filter_date = datetime.now()
+
+        # Calculate time range based on hours parameter
+        if time_filter > 0:
+            start_time = filter_date - timedelta(hours=time_filter)
+        else:
+            start_time = filter_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # Query the database for records based on the selected time window
+        recent_data = (
+            aquamans.query.filter(aquamans.timeData >= start_time)
+            .order_by(aquamans.timeData)
+            .all()
+        )
+
+        # If no records found in the selected time range
+        if not recent_data:
+            return jsonify({"message": "No records found in the selected time range."})
+
+        # Prepare the data for the table
+        data = [["ID", "Temperature (°C)", "Oxygen (mg/L)", "pH Level", "Turbidity", "Time"]]
+        for row in recent_data:
+            data.append([row.id, row.temperature, row.oxygen, row.phlevel, row.turbidity, row.timeData])
+
+        # Create PDF using ReportLab
+        buffer = BytesIO()
+        pdf = SimpleDocTemplate(buffer, pagesize=letter)
+        table = Table(data)
+
+        # Apply styling to the table
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.white),
+            ("GRID", (0, 0), (-1, -1), 1, colors.black),
+        ]))
+
+        # Build the PDF document
+        pdf.build([table])
+
+        # Return the generated PDF as a response
+        buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name="data-report.pdf", mimetype="application/pdf")
     
+    except Exception as e:
+        logging.error(f"Error generating report: {str(e)}")
+        return jsonify({"message": "An error occurred while generating the report."}), 500
+
+    
+@app.before_request
+def check_system_status():
+    """
+    Middleware to check if the system is active before processing requests.
+    """
+    global active
+    if not active:
+        return jsonify({"message": "System is cooling down. Please try again in a few minutes."}), 503
     
 if __name__ == '__main__':
     app.run(debug=True)

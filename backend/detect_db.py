@@ -20,7 +20,7 @@ db_config = {
 }
 
 # Path to the YOLOv8 model weights
-model = YOLO("C:/Users/ADMIN/AquaAutoManS/machine_learning/weights/best1.pt")  # Adjust the path for your system
+model = YOLO("C:/Users/user/AquaAutoManS/machine_learning/weights/best1.pt")  # Adjust the path for your system
 
 class_names = ["catfish", "dead_catfish"]
 recent_detections = {"catfish": [], "dead_catfish": []}
