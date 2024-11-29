@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import mysql.connector
 import time
 
+
 FLASK_API_URL = "http://127.0.0.1:5000/update_detection"
 
 # MySQL Database connection settings
@@ -65,7 +66,6 @@ while True:
             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
             conf = box.conf[0]
             cls = int(box.cls[0])
-
             # Filter small detections
             if (x2 - x1) < 20 or (y2 - y1) < 20:
                 continue
@@ -151,3 +151,4 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
+

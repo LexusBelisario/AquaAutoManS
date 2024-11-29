@@ -3,17 +3,16 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy import text
 from datetime import datetime, timedelta
-import threading
 import logging
-import time
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib import colors
 import base64
-import os
-from PIL import Image
+import cv2
+import logging
+from detect import model, cap, class_names 
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -39,12 +38,35 @@ class aquamans(db.Model):
     dead_catfish = db.Column(db.Float, default=0)
     timeData = db.Column(db.DateTime, default=datetime.utcnow)
     dead_catfish_image = db.Column(db.LargeBinary, nullable=True)
+    
+def generate_frames():
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            logging.error("Failed to grab frame from webcam.")
+            break
+
+        results = model.predict(frame, conf=0.5, iou=0.4)
+        for result in results:
+            for box in result.boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+                cls = int(box.cls[0])
+                color = (0, 255, 0) if cls == 0 else (0, 0, 255)
+                label = f"{class_names[cls]} {box.conf[0]:.2f}"
+                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+        _, buffer = cv2.imencode('.jpg', frame)
+        frame = buffer.tobytes()
+
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 
 @app.route('/temperature', methods=['GET'])
 def get_temperature():
     try:
-        latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()  # Sort by timeData
+        latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()
         if latest_record:
             logging.debug(f"Latest temperature record: {latest_record.temperature}")
             return jsonify({'temperature': latest_record.temperature})
@@ -58,7 +80,7 @@ def get_temperature():
 @app.route('/oxygen', methods=['GET'])
 def get_oxygen():
     try:
-        latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()  # Sort by timeData
+        latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()
         if latest_record:
             logging.debug(f"Latest oxygen record: {latest_record.oxygen}")
             return jsonify({'oxygen': latest_record.oxygen})
@@ -72,7 +94,7 @@ def get_oxygen():
 @app.route('/phlevel', methods=['GET'])
 def get_phlevel():
     try:
-        latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()  # Sort by timeData
+        latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()
         if latest_record:
             logging.debug(f"Latest pH level record: {latest_record.phlevel}")
             return jsonify({'phlevel': latest_record.phlevel})
@@ -86,7 +108,7 @@ def get_phlevel():
 @app.route('/turbidity', methods=['GET'])
 def get_turbidity():
     try:
-        latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()  # Sort by timeData
+        latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()
         if latest_record:
             logging.debug(f"Latest turbidity record: {latest_record.turbidity}")
             return jsonify({'turbidity': latest_record.turbidity})
@@ -235,7 +257,7 @@ def update_sensor_data():
             oxygen=data.get('oxygen'),
             phlevel=data.get('phlevel'),
             turbidity=data.get('turbidity'),
-            timeData=datetime.utcnow()  # Explicitly set the timestamp
+            timeData=datetime.utcnow()
         )
         db.session.add(new_record)
         db.session.commit()
@@ -274,153 +296,154 @@ def update_detection():
 @app.route('/check_dead_catfish', methods=['GET'])
 def check_dead_catfish():
     try:
-        # Fetch the last 10 records to analyze consecutive dead_catfish detections
-        recent_records = (
-            aquamans.query.order_by(aquamans.timeData.desc())
-            .limit(10)
-            .all()
-        )
+        dead_catfish_records = aquamans.query.filter(aquamans.dead_catfish > 0).order_by(aquamans.timeData.desc()).all()
 
-        if not recent_records:
-            return jsonify({
-                'message': 'No data available in the system.',
-            })
+        if not dead_catfish_records:
+            latest_record = aquamans.query.order_by(aquamans.id.desc()).first()
+            if latest_record:
+                return jsonify({
+                    'message': 'No dead catfish detected in the system.',
+                    'latest_data': {
+                        'temperature': latest_record.temperature,
+                        'oxygen': latest_record.oxygen,
+                        'phlevel': latest_record.phlevel,
+                        'turbidity': latest_record.turbidity
+                    }
+                })
 
-        # Check for consecutive dead_catfish detections
-        consecutive_count = 0
-        latest_record = None
+        latest_record = dead_catfish_records[0]
 
-        for record in recent_records:
-            if record.dead_catfish > 0:
-                consecutive_count += 1
-                latest_record = record
-            else:
-                # Reset the counter if a zero value is encountered
-                consecutive_count = 0
+        possible_causes = []
 
-            # If we reach 5 consecutive detections, confirm a dead catfish
-            if consecutive_count >= 5:
-                break
+        if 26 <= latest_record.temperature <= 32:
+            temperature_status = "The Water had a Normal Temperature"
+        elif 20 < latest_record.temperature < 26:
+            temperature_status = "The Water had a Below Average Temperature"
+        elif latest_record.temperature <= 20:
+            temperature_status = "The Water had a Cold Temperature"
+        elif 26 < latest_record.temperature < 35:
+            temperature_status = "The Water had an Above Average Temperature"
+        elif latest_record.temperature >= 35:
+            temperature_status = "The Water had a Hot Temperature"
 
-        # If a dead catfish is confirmed, notify the user
-        if consecutive_count >= 5 and latest_record:
-            # Determine possible causes based on temperature, oxygen, and pH level
-            possible_causes = []
+        if latest_record.oxygen == 0:
+            oxygen_status = "The Water had a Very Low Oxygen"
+        elif latest_record.oxygen < 1.5:
+            oxygen_status = "The Water had a Low Oxygen"
+        elif 1.5 <= latest_record.oxygen <= 5:
+            oxygen_status = "The Water had a Normal Oxygen"
+        else:
+            oxygen_status = "The Water had a High Oxygen"
 
-            # Temperature conditions
-            if 26 <= latest_record.temperature <= 32:
-                temperature_status = "The Water had a Normal Temperature"
-            elif 20 < latest_record.temperature < 26:
-                temperature_status = "The Water had a Below Average Temperature"
-            elif latest_record.temperature <= 20:
-                temperature_status = "The Water had a Cold Temperature"
-            elif 26 < latest_record.temperature < 35:
-                temperature_status = "The Water had an Above Average Temperature"
-            elif latest_record.temperature >= 35:
-                temperature_status = "The Water had a Hot Temperature"
+        if latest_record.phlevel < 4:
+            ph_status = "The Water was Very Acidic"
+        elif 4 <= latest_record.phlevel < 6:
+            ph_status = "The Water was Acidic"
+        elif 6 <= latest_record.phlevel <= 7.5:
+            ph_status = "The Water was Normal pH Level"
+        elif 7 < latest_record.phlevel <= 9:
+            ph_status = "The Water was Very Alkaline"
 
-            # Oxygen conditions
-            if latest_record.oxygen == 0:
-                oxygen_status = "The Water had a Very Low Oxygen"
-            elif latest_record.oxygen < 1.5:
-                oxygen_status = "The Water had a Low Oxygen"
-            elif 1.5 <= latest_record.oxygen <= 5:
-                oxygen_status = "The Water had a Normal Oxygen"
-            else:
-                oxygen_status = "The Water had a High Oxygen"
+        if temperature_status != "The Water had a Normal Temperature":
+            possible_causes.append(temperature_status)
+        if oxygen_status != "The Water had a Normal Oxygen":
+            possible_causes.append(oxygen_status)
+        if ph_status != "The Water was Normal pH Level":
+            possible_causes.append(ph_status)
 
-            # pH level conditions
-            if latest_record.phlevel < 4:
-                ph_status = "The Water was Very Acidic"
-            elif 4 <= latest_record.phlevel < 6:
-                ph_status = "The Water was Acidic"
-            elif 6 <= latest_record.phlevel <= 7.5:
-                ph_status = "The Water was Normal pH Level"
-            elif 7.5 < latest_record.phlevel <= 9:
-                ph_status = "The Water was Very Alkaline"
+        possible_causes_message = "The system detected that: " + " and that: ".join(possible_causes) + " volume(s). These are the high probable causes of death for catfishes."
 
-            # Add to the possible causes based on detected conditions (excluding normal conditions)
-            if temperature_status != "The Water had a Normal Temperature":
-                possible_causes.append(temperature_status)
-            if oxygen_status != "The Water had a Normal Oxygen":
-                possible_causes.append(oxygen_status)
-            if ph_status != "The Water was Normal pH Level":
-                possible_causes.append(ph_status)
-
-            # Construct the possible causes message
-            possible_causes_message = "The system detected that: " + " and that: ".join(possible_causes) + " volume(s). These are the high probable causes of death for catfishes."
-
-            # Structure the response message
-            message = {
-                "alert": "A catfish has died! Please remove it immediately.",
-                "details": {
-                    "temperature": latest_record.temperature,
-                    "temperature_status": temperature_status,
-                    "oxygen": latest_record.oxygen,
-                    "oxygen_status": oxygen_status,
-                    "phlevel": latest_record.phlevel,
-                    "phlevel_status": ph_status,
-                    "turbidity": latest_record.turbidity,
-                    "turbidity_status": latest_record.turbidityResult,
-                    "dead_catfish_count": latest_record.dead_catfish,
-                    "time_detected": latest_record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
-                    "note": "Remove the dead catfish immediately to avoid water contamination.",
-                    "possible_causes": possible_causes_message,
-                },
-            }
-            logging.warning(f"Dead catfish detected 5 or more times consecutively: {message}")
-            return jsonify(message)
-
-        # If no critical dead_catfish event, return a normal message
-        return jsonify({
-            'message': 'No critical dead catfish event detected.',
-            'latest_data': {
-                'temperature': recent_records[0].temperature,
-                'oxygen': recent_records[0].oxygen,
-                'phlevel': recent_records[0].phlevel,
-                'turbidity': recent_records[0].turbidity
-            }
-        })
+        message = {
+            "alert": "A catfish has died! Please remove it immediately.",
+            "details": {
+                "temperature": latest_record.temperature,
+                "temperature_status": temperature_status,
+                "oxygen": latest_record.oxygen,
+                "oxygen_status": oxygen_status,
+                "phlevel": latest_record.phlevel,
+                "phlevel_status": ph_status,
+                "turbidity": latest_record.turbidity,
+                "turbidity_status": latest_record.turbidityResult,
+                "dead_catfish_count": latest_record.dead_catfish,
+                "time_detected": latest_record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
+                "note": "Remove the dead catfish immediately to avoid water contamination.",
+                "possible_causes": possible_causes_message,
+            },
+        }
+        logging.warning(f"Dead catfish detected: {message}")
+        return jsonify(message)
 
     except Exception as e:
         logging.error(f"Error checking for dead catfish: {e}")
         return jsonify({'error': str(e)})
-
     
+    
+@app.route('/update_aquamans', methods=['POST'])
+def update_aquamans():
+    global dead_catfish_counter
+
+    try:
+        new_record = request.json
+        dead_catfish_count = new_record.get("dead_catfish", 0)
+
+        if dead_catfish_count > 0:
+            dead_catfish_counter += 1
+        else:
+            dead_catfish_counter = 0
+
+        if dead_catfish_counter >= 5:
+            dead_catfish_counter = 0
+            
+            response = print_dead_catfish_report()
+            return response 
+
+        record = aquamans(
+            temperature=new_record["temperature"],
+            oxygen=new_record["oxygen"],
+            phlevel=new_record["phlevel"],
+            turbidity=new_record["turbidity"],
+            catfish=new_record["catfish"],
+            dead_catfish=new_record["dead_catfish"],
+            timeData=new_record["timeData"],
+        )
+        db.session.add(record)
+        db.session.commit()
+
+        return jsonify({"message": "Record updated successfully!"})
+
+    except Exception as e:
+        logging.error(f"Error updating aquamans: {e}")
+        return jsonify({"error": str(e)})
+
 
 @app.route('/check_dead_catfish/print', methods=['GET'])
 def print_dead_catfish_report():
     try:
-        # Fetch the last 5 records where dead_catfish is detected
-        recent_records = (
+        latest_dead_record = (
             aquamans.query.filter(aquamans.dead_catfish > 0)
             .order_by(aquamans.timeData.desc())
-            .limit(5)
-            .all()
+            .first()
         )
 
-        if len(recent_records) == 5 and all(record.dead_catfish > 0 for record in recent_records):
-            # Notify user of dead catfish
-            latest_record = recent_records[0]  # Most recent record
+        if not latest_dead_record:
+            return jsonify({"message": "No dead catfish detected in the system."})
 
-        # Fetch data from the last 3 hours
-        three_hours_ago = latest_record.timeData - timedelta(hours=3)
+        three_hours_ago = latest_dead_record.timeData - timedelta(hours=3)
         recent_data = (
             aquamans.query.filter(
-                aquamans.timeData.between(three_hours_ago, latest_record.timeData)
+                aquamans.timeData.between(three_hours_ago, latest_dead_record.timeData)
             )
             .order_by(aquamans.timeData)
             .all()
         )
 
-        # Prepare data for the PDF
         data = [["ID", "Temperature (°C)", "Oxygen (mg/L)", "pH", "Turbidity (NTU)", "Alive Catfish", "Dead Catfish", "Time"]]
-        total_catfish = 0  # To accumulate total catfish (alive + dead)
-        total_dead_catfish = 0  # To accumulate total dead catfish
+        total_catfish = 0 
+        total_dead_catfish = 0 
 
         for record in recent_data:
-            total_catfish += record.catfish + record.dead_catfish  # Add alive and dead catfish to total
-            total_dead_catfish += record.dead_catfish  # Add dead catfish to total
+            total_catfish += record.catfish + record.dead_catfish
+            total_dead_catfish += record.dead_catfish
 
             data.append([
                 record.id,
@@ -433,19 +456,16 @@ def print_dead_catfish_report():
                 record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
             ])
 
-        # If there are no catfish, we can't compute the mortality rate
         if total_catfish == 0:
             mortality_rate = 0
         else:
-            mortality_rate = (total_dead_catfish / 5) * 100  # Calculate mortality rate as a percentage
+            mortality_rate = (total_dead_catfish / total_catfish) * 100
 
-        # Tallied Results
         temperature = latest_dead_record.temperature
         oxygen = latest_dead_record.oxygen
         phlevel = latest_dead_record.phlevel
         turbidity = latest_dead_record.turbidity
 
-        # Temperature status
         if 26 <= temperature <= 32:
             temperature_status = "Normal Temperature"
         elif 20 < temperature < 26:
@@ -457,7 +477,6 @@ def print_dead_catfish_report():
         elif temperature >= 35:
             temperature_status = "Hot Temperature"
 
-        # Oxygen status
         if oxygen == 0:
             oxygen_status = "Very Low Oxygen"
         elif oxygen < 1.5:
@@ -467,7 +486,6 @@ def print_dead_catfish_report():
         else:
             oxygen_status = "High Oxygen"
 
-        # pH level status
         if phlevel < 4:
             ph_status = "Very Acidic"
         elif 4 <= phlevel < 6:
@@ -477,7 +495,6 @@ def print_dead_catfish_report():
         elif 7 < phlevel <= 9:
             ph_status = "Very Alkaline"
 
-        # Turbidity status
         if turbidity < 20:
             turbidity_status = "Clean Water"
         elif 20 <= turbidity < 50:
@@ -485,7 +502,6 @@ def print_dead_catfish_report():
         else:
             turbidity_status = "Dirty Water"
 
-        # Concatenating the result in the desired format
         result_message = (
             f"Temperature: {temperature:.1f} ({temperature_status})\n"
             f"Oxygen: {oxygen:.1f} ({oxygen_status})\n"
@@ -494,63 +510,78 @@ def print_dead_catfish_report():
             f"Mortality Rate: {mortality_rate:.2f}%"
         )
 
-        # Define the PDF style for the paragraph
         styles = getSampleStyleSheet()
-        pdf_style = styles['Normal']  # You can customize this style further if needed
+        pdf_style = styles['Normal']
 
-        # Generate PDF with adjusted table fit
         buffer = BytesIO()
         pdf = SimpleDocTemplate(buffer, pagesize=letter)
 
-        # Set column widths to prevent overlap
-        col_widths = [35, 55, 55, 55, 55, 45, 45, 80]  # Adjust these values as needed
+        col_widths = [35, 55, 55, 55, 55, 45, 45, 80]
 
         table = Table(data, colWidths=col_widths)
 
-        # Apply table style with adjustments
         table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("GRID", (0, 0), (-1, -1), 1, colors.black),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 10),  # Header font size
-            ("FONTSIZE", (0, 1), (-1, -1), 8),  # Data font size
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),  # Center align vertically
+            ("FONTSIZE", (0, 0), (-1, 0), 10),
+            ("FONTSIZE", (0, 1), (-1, -1), 8),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("TEXTCOLOR", (0, 0), (-1, -1), colors.black),
-            ("WORDWRAP", (0, 0), (-1, -1), True),  # Allow word wrapping
-            ("LEFTPADDING", (0, 0), (-1, -1), 5),  # Add padding to the left side
-            ("RIGHTPADDING", (0, 0), (-1, -1), 5),  # Add padding to the right side
-            ("TOPPADDING", (0, 0), (-1, -1), 5),  # Add padding to the top
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),  # Add padding to the bottom
+            ("WORDWRAP", (0, 0), (-1, -1), True),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ]))
 
-        # Build the PDF
         pdf.build([table])
 
-        # Append result message below the table in the PDF
         buffer.seek(0)
         output_pdf = BytesIO()
         pdf = SimpleDocTemplate(output_pdf, pagesize=letter)
         story = []
 
-        # Rebuild table and add to PDF
         story.append(table)
 
-        # Add result message below the table
         result_paragraph = Paragraph(result_message, style=pdf_style)
         story.append(result_paragraph)
 
         pdf.build(story)
 
         output_pdf.seek(0)
-        return send_file(output_pdf, as_attachment=True, download_name="dead_catfish_report_with_mortality_rate.pdf", mimetype="application/pdf")
+        return send_file(output_pdf, as_attachment=True, download_name="dead-catfish-report.pdf", mimetype="application/pdf")
 
     except Exception as e:
         logging.error(f"Error generating dead catfish report: {e}")
         return jsonify({"error": str(e)})
 
     
+@app.route('/video_feed', methods=['GET'])
+def video_feed():
+    """Serve real-time video feed."""
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+@app.route('/detection_data', methods=['GET'])
+def detection_data():
+    """Fetch YOLO detection data from the database."""
+    try:
+        latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()
+        if latest_record:
+            data = {
+                'catfish': latest_record.catfish,
+                'dead_catfish': latest_record.dead_catfish,
+                'timeData': latest_record.timeData.isoformat()
+            }
+            return jsonify(data)
+        else:
+            return jsonify({'error': 'No detection data found.'})
+    except Exception as e:
+        logging.error(f"Error fetching detection data: {e}")
+        return jsonify({'error': str(e)})
+    
+    
 if __name__ == '__main__':
     app.run(debug=True)
