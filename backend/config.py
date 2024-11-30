@@ -54,8 +54,26 @@ def periodic_sleep():
         active = True  # Re-enable active operations
         logging.info("System resumed.")
 
+def some_background_task():
+    while True:
+        if not active:
+            logging.info("Task paused due to system rest period.")
+            time.sleep(300)  # Wait until the rest period ends
+            continue
+        # Perform the task
+        logging.info("Task executed.")
+        time.sleep(60)
+
 sleep_thread = threading.Thread(target=periodic_sleep, daemon=True)
 sleep_thread.start()    
+
+@app.route('/some-sensitive-task', methods=['GET'])
+def sensitive_task():
+    if not active:
+        return jsonify({'status': 'inactive', 'message': 'System is in rest mode. Try again later.'}), 503
+    # Perform the task
+    return jsonify({'status': 'success', 'message': 'Task executed successfully.'})
+
 
 @app.route('/temperature', methods=['GET'])
 def get_temperature():
@@ -628,9 +646,9 @@ def print_data_report():
             return jsonify({"message": "No records found in the selected time range."})
 
         # Prepare the data for the table
-        data = [["ID", "Temperature (°C)", "Oxygen (mg/L)", "pH Level", "Turbidity", "Time"]]
+        data = [["ID", "Temperature (°C)", "Oxygen (mg/L)", "pH Level", "Turbidity", "Catfish", "Dead Catfish", "Time"]]
         for row in recent_data:
-            data.append([row.id, row.temperature, row.oxygen, row.phlevel, row.turbidity, row.timeData])
+            data.append([row.id, row.temperature, row.oxygen, row.phlevel, row.turbidity, row.catfish, row.dead_catfish, row.timeData])
 
         # Create PDF using ReportLab
         buffer = BytesIO()
