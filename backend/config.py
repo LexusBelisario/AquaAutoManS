@@ -343,11 +343,22 @@ def update_detection():
 @app.route('/check_dead_catfish', methods=['GET'])
 def check_dead_catfish():
     try:
+        # Query for records with dead catfish counts
         dead_catfish_records = aquamans.query.filter(aquamans.dead_catfish > 0).order_by(aquamans.timeData.desc()).all()
 
+        # If no dead catfish are detected, check for the latest record
         if not dead_catfish_records:
             latest_record = aquamans.query.order_by(aquamans.id.desc()).first()
             if latest_record:
+                # Disregard all-zero tables
+                if (latest_record.temperature == 0 and
+                    latest_record.oxygen == 0 and
+                    latest_record.phlevel == 0 and
+                    latest_record.turbidity == 0):
+                    return jsonify({
+                        'message': 'No valid data available in the system.',
+                    })
+
                 return jsonify({
                     'message': 'No dead catfish detected in the system.',
                     'latest_data': {
@@ -358,10 +369,22 @@ def check_dead_catfish():
                     }
                 })
 
+        # Process the latest record where dead catfish were detected
         latest_record = dead_catfish_records[0]
 
+        # Disregard all-zero tables
+        if (latest_record.temperature == 0 and
+            latest_record.oxygen == 0 and
+            latest_record.phlevel == 0 and
+            latest_record.turbidity == 0):
+            return jsonify({
+                'message': 'No valid data available in the system.',
+            })
+
+        # Analyze potential causes
         possible_causes = []
 
+        # Temperature analysis
         if 26 <= latest_record.temperature <= 32:
             temperature_status = "The Water had a Normal Temperature"
         elif 20 < latest_record.temperature < 26:
@@ -373,6 +396,7 @@ def check_dead_catfish():
         elif latest_record.temperature >= 35:
             temperature_status = "The Water had a Hot Temperature"
 
+        # Oxygen analysis
         if latest_record.oxygen == 0:
             oxygen_status = "The Water had a Very Low Oxygen"
         elif latest_record.oxygen < 1.5:
@@ -382,6 +406,7 @@ def check_dead_catfish():
         else:
             oxygen_status = "The Water had a High Oxygen"
 
+        # pH analysis
         if latest_record.phlevel < 4:
             ph_status = "The Water was Very Acidic"
         elif 4 <= latest_record.phlevel < 6:
@@ -389,8 +414,11 @@ def check_dead_catfish():
         elif 6 <= latest_record.phlevel <= 7.5:
             ph_status = "The Water was Normal pH Level"
         elif 7 < latest_record.phlevel <= 9:
+            ph_status = "The Water was Alkaline"
+        elif latest_record.phlevel > 9:
             ph_status = "The Water was Very Alkaline"
 
+        # Identify causes of death
         if temperature_status != "The Water had a Normal Temperature":
             possible_causes.append(temperature_status)
         if oxygen_status != "The Water had a Normal Oxygen":
@@ -398,8 +426,10 @@ def check_dead_catfish():
         if ph_status != "The Water was Normal pH Level":
             possible_causes.append(ph_status)
 
+        # Generate the possible causes message
         possible_causes_message = "The system detected that: " + " and that: ".join(possible_causes) + " volume(s). These are the high probable causes of death for catfishes."
 
+        # Generate the final message
         message = {
             "alert": "A catfish has died! Please remove it immediately.",
             "details": {
@@ -536,11 +566,11 @@ def print_dead_catfish_report():
         if phlevel < 4:
             ph_status = "Very Acidic"
         elif 4 <= phlevel < 6:
-            ph_status = "Acidic"
+            ph_status = "Low pH Level"
         elif 6 <= phlevel <= 7.5:
             ph_status = "Normal pH Level"
         elif 7 < phlevel <= 9:
-            ph_status = "Very Alkaline"
+            ph_status = "High pH Level"
 
         if turbidity < 20:
             turbidity_status = "Clean Water"
