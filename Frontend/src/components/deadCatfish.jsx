@@ -17,7 +17,7 @@ export default function DeadCatfish() {
     };
 
     fetchDeadCount();
-    const interval = setInterval(fetchDeadCount, 5000); // Refresh every 5 seconds
+    const interval = setInterval(fetchDeadCount, 2000); // Refresh every 5 seconds
 
     return () => clearInterval(interval); // Cleanup on component unmount
   }, []);

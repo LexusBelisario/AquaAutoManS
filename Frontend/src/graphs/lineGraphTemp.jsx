@@ -25,19 +25,27 @@ export const LineGraphTemp = () => {
   const [temperatureData, setTemperatureData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("weekly"); // default filter is 'weekly'
+  const [selectedDate, setSelectedDate] = useState(""); // state to store selected date
+  const [weekStart, setWeekStart] = useState(""); // state to store selected week start date
 
   useEffect(() => {
     const fetchTemperatureData = async () => {
       try {
-        const response = await fetch(
-          `http://127.0.0.1:5000/weekly-temperature-data?filter=${filter}`
-        );
+        let url = `http://127.0.0.1:5000/filtered-temperature-data?filter=${filter}`;
+
+        // Append the selected date or week start to the request if available
+        if (filter === "date" && selectedDate) {
+          url += `&selected_date=${selectedDate}`;
+        } else if (filter === "week" && weekStart) {
+          url += `&week_start=${weekStart}`;
+        }
+
+        const response = await fetch(url);
         const data = await response.json();
 
         console.log("Fetched data:", data);
 
         const processedData = processTemperatureData(data);
-
         setTemperatureData(processedData);
         setLoading(false);
       } catch (error) {
@@ -46,7 +54,7 @@ export const LineGraphTemp = () => {
       }
     };
     fetchTemperatureData();
-  }, [filter]); // refetch data when filter changes
+  }, [filter, selectedDate, weekStart]); // refetch data when filter, selectedDate, or weekStart changes
 
   const processTemperatureData = (data) => {
     const labels =
@@ -142,8 +150,34 @@ export const LineGraphTemp = () => {
         <select value={filter} onChange={(e) => setFilter(e.target.value)}>
           <option value="weekly">Weekly</option>
           <option value="3hours">Every 3 Hours</option>
+          <option value="date">By Date</option>
+          <option value="week">By Week</option>
         </select>
       </div>
+
+      {/* Show input fields based on selected filter */}
+      {filter === "date" && (
+        <div className="mb-4">
+          <label>Select Date: </label>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+          />
+        </div>
+      )}
+
+      {filter === "week" && (
+        <div className="mb-4">
+          <label>Select Week Start (Sunday): </label>
+          <input
+            type="date"
+            value={weekStart}
+            onChange={(e) => setWeekStart(e.target.value)}
+          />
+        </div>
+      )}
+
       {temperatureData.labels.length > 0 ? (
         <Line options={options} data={temperatureData} />
       ) : (

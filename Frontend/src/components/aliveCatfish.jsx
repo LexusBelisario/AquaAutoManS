@@ -17,7 +17,7 @@ export default function AliveCatfish() {
     };
 
     fetchAliveCount();
-    const interval = setInterval(fetchAliveCount, 5000); // Refresh every 5 seconds
+    const interval = setInterval(fetchAliveCount, 2000); // Refresh every 5 seconds
 
     return () => clearInterval(interval); // Cleanup on component unmount
   }, []);

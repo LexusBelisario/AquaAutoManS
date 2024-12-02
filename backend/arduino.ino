@@ -2,7 +2,6 @@
 #include <DallasTemperature.h>
 
 #define ONE_WIRE_BUS 4 // Pin where the DS18B20 is connected
-#define DO_SENSOR_PIN A0 // Pin where the Dissolved Oxygen sensor is connected
 #define PH_SENSOR_PIN A1 // Pin where the Gravity pH sensor is connected
 #define TURBIDITY_SENSOR_PIN A3 // Pin where the Turbidity sensor is connected
 
@@ -30,10 +29,6 @@ void loop() {
   // Get temperature from DS18B20
   sensors.requestTemperatures();
   temperature = sensors.getTempCByIndex(0);
-
-  // Get dissolved oxygen value
-  int doSensorValue = analogRead(DO_SENSOR_PIN);
-  dissolvedOxygen = doSensorValue * (5.0 / 1024.0) * doCalibrationFactor;
 
   // Get pH value
   int pHSensorValue = analogRead(PH_SENSOR_PIN);
@@ -65,25 +60,6 @@ void loop() {
   else if (temperature >= 35) {
     Serial.print("HotTemperature");
   }
-
-   Serial.print(" ");
-
-  // Serial.print("Dissolved Oxygen (mg/L): ");
-  Serial.print(dissolvedOxygen);
-  Serial.print(" ");
-  // Serial.println("mg/L");
-  if (dissolvedOxygen == 0){
-    Serial.print("VeryLowOxygen");
-  } 
-  else if (dissolvedOxygen < 1.5){
-    Serial.print("LowOxygen");
-  } 
-    else if (dissolvedOxygen >= 1.5 && dissolvedOxygen <=5){
-    Serial.print("NormalOxygen");
-  } 
-    else if (dissolvedOxygen < 5){
-    Serial.print("HighOxygen");
-  } 
 
   Serial.print(" ");
 

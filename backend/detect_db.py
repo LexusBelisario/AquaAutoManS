@@ -8,19 +8,16 @@ from datetime import datetime, timedelta
 import mysql.connector
 import time
 
-
 FLASK_API_URL = "http://127.0.0.1:5000/update_detection"
 
-# MySQL Database connection settings
 db_config = {
-    'host': 'localhost',  # Change to your MySQL host
-    'user': 'root',  # Change to your MySQL username
-    'password': '',  # Change to your MySQL password
-    'database': 'dbserial'  # The database you created earlier
+    'host': 'localhost',
+    'user': 'root',
+    'password': '',
+    'database': 'dbserial'
 }
 
-# Path to the YOLOv8 model weights
-model = YOLO("C:/Users/ADMIN/AquaAutoManS/machine_learning/weights/best1.pt")  # Adjust the path for your system
+model = YOLO("C:/Users/ADMIN/AquaAutoManS/machine_learning/weights/best1.pt")
 
 class_names = ["catfish", "dead_catfish"]
 recent_detections = {"catfish": [], "dead_catfish": []}
@@ -30,33 +27,47 @@ if not cap.isOpened():
     print("Error: Could not open webcam.")
     exit()
 
-# Buffer to track detection and detect first dead catfish
 dead_catfish_detected = False
-last_capture_time = None  # To track when the last capture was made
+last_capture_time = None
 
-# Establish a MySQL connection
 def get_db_connection():
     connection = mysql.connector.connect(**db_config)
     return connection
 
+def get_latest_sensor_data():
+    """"""
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True) 
+
+        query = "SELECT * FROM aquamans ORDER BY id DESC LIMIT 1"
+        cursor.execute(query)
+        latest_record = cursor.fetchone()
+
+        cursor.close()
+        connection.close()
+
+        return latest_record
+    except mysql.connector.Error as e:
+        print(f"Error fetching latest sensor data: {e}")
+        return None
+
 print("Press 'q' to exit the detection.")
 
-# Timer variables
 start_time = datetime.now()
 
 while True:
     elapsed_time = datetime.now() - start_time
-    if elapsed_time >= timedelta(hours=1):  # Check if 1 hour has passed
+    if elapsed_time >= timedelta(hours=1):
         print("Resting for 5 minutes to prevent overheating...")
-        time.sleep(300)  # Rest for 5 minutes (300 seconds)
-        start_time = datetime.now()  # Reset the start time
+        time.sleep(300)
+        start_time = datetime.now() 
 
     ret, frame = cap.read()
     if not ret:
         print("Error: Failed to capture frame.")
         break
 
-    # Perform prediction
     results = model.predict(frame, conf=0.25, iou=0.5)
     catfish_count = 0
     dead_catfish_count = 0
@@ -66,59 +77,69 @@ while True:
             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
             conf = box.conf[0]
             cls = int(box.cls[0])
-            # Filter small detections
+            
             if (x2 - x1) < 20 or (y2 - y1) < 20:
                 continue
             
             label = f"{class_names[cls]} {conf:.2f}"
-            color = (0, 255, 0) if cls == 0 else (0, 0, 255)  # Green for catfish, Red for dead catfish
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)  # Draw rectangle
+            color = (0, 255, 0) if cls == 0 else (0, 0, 255)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
             cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
-            if cls == 0:  # catfish
+            if cls == 0:
                 catfish_count += 1
-            elif cls == 1:  # dead_catfish
+            elif cls == 1:
                 dead_catfish_count += 1
-                if not dead_catfish_detected:  # Take picture when dead catfish is first detected
+                if not dead_catfish_detected:
                     dead_catfish_detected = True
 
-                # Check if 5 minutes have passed since the last capture
                 current_time = datetime.now()
                 if last_capture_time is None or (current_time - last_capture_time).total_seconds() >= 20:
-                    # Capture new image every 20 seconds
-                    last_capture_time = current_time  # Update the last capture time
+                    
+                    last_capture_time = current_time
 
-                    # Convert the frame to image and encode to binary (for uploading)
                     pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
 
-                    # Convert to binary
                     img_byte_arr = BytesIO()
                     pil_image.save(img_byte_arr, format='JPEG')
                     img_byte_arr = img_byte_arr.getvalue()
 
-                    # Connect to MySQL database and insert image
+                    latest_data = get_latest_sensor_data()
+                    if latest_data is None:
+                        print("No latest data available. Skipping image upload.")
+                        continue 
+
+                    query = """
+                    INSERT INTO aquamans (temperature, tempResult, oxygen, oxygenResult, phlevel, phResult, turbidity, turbidityResult, catfish, dead_catfish, timeData, dead_catfish_image)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    data_to_insert = (
+                        latest_data["temperature"],
+                        latest_data["tempResult"],
+                        latest_data["oxygen"],
+                        latest_data["oxygenResult"],
+                        latest_data["phlevel"],
+                        latest_data["phResult"],
+                        latest_data["turbidity"],
+                        latest_data["turbidityResult"],
+                        catfish_count,
+                        dead_catfish_count,
+                        current_time,
+                        img_byte_arr
+                    )
+
                     try:
                         connection = get_db_connection()
                         cursor = connection.cursor()
-
-                        # SQL query to insert image into the database
-                        query = """
-                        INSERT INTO aquamans (dead_catfish_image, timeData)
-                        VALUES (%s, %s)
-                        """
-                        cursor.execute(query, (img_byte_arr, current_time))
+                        cursor.execute(query, data_to_insert)
                         connection.commit()
 
-                        print(f"Dead catfish detected. Image uploaded to MySQL at {current_time}")
-
-                        # Close the connection
+                        print(f"Dead catfish detected. Image and latest sensor data uploaded at {current_time}")
                         cursor.close()
                         connection.close()
-
                     except mysql.connector.Error as e:
-                        print(f"Error uploading to MySQL: {e}")
+                        print(f"Error uploading data to MySQL: {e}")
 
-    # Send the catfish and dead catfish counts to Flask backend
     data = {
         'catfish': catfish_count,
         'dead_catfish': dead_catfish_count
@@ -142,10 +163,8 @@ while True:
     catfish_count = int(sum(recent_detections["catfish"]) / len(recent_detections["catfish"]))
     dead_catfish_count = int(sum(recent_detections["dead_catfish"]) / len(recent_detections["dead_catfish"]))
 
-    # Show frame
     cv2.imshow("YOLOv8 Real-Time Detection", frame)
 
-    # Exit on 'q'
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 

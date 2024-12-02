@@ -7,11 +7,14 @@ import Oxygen from "../components/oxygenn";
 import PhLevel from "../components/phLevel";
 import AliveCatfish from "../components/aliveCatfish";
 import DeadCatfish from "../components/deadCatfish";
+import TotalCatfish from "../components/totalCatfish";
 import AlertBox from "../components/alertBox";
+import PictureBox from "../components/pictureBox";
 import LiveMonitoring from "../pages/LiveMonitoring";
 import { LineGraphTemp } from "../graphs/lineGraphTemp";
 import { LineGraphOxygen } from "../graphs/lineGraphOxy";
 import { LineGraphPH } from "../graphs/lineGraphPH";
+import { LineGraphTurb } from "../graphs/lineGraphTurb";
 import axios from "axios";
 
 export default function Homepage({ setAuth }) {
@@ -21,20 +24,16 @@ export default function Homepage({ setAuth }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch the alert for dead catfish detection from the backend
         const response = await axios.get(
           "http://localhost:5000/check_dead_catfish"
         );
 
-        // Check if there is an alert message from the backend
         if (response.data.alert) {
-          // Add the alert to the alerts state
           setAlerts((prevAlerts) => {
             const newAlert = {
               message: response.data.alert,
               details: response.data.details,
             };
-            // Prevent duplicate alerts
             return prevAlerts.some(
               (alert) => alert.message === newAlert.message
             )
@@ -48,7 +47,7 @@ export default function Homepage({ setAuth }) {
     };
 
     fetchData();
-    const intervalId = setInterval(fetchData, 5000); // Check every 5 seconds
+    const intervalId = setInterval(fetchData, 2000);
     return () => clearInterval(intervalId);
   }, []);
   const removeAlert = (index) => {
@@ -88,6 +87,7 @@ export default function Homepage({ setAuth }) {
             <div className="flex flex-wrap justify-start space-x-10 my-5 gap-28">
               <AliveCatfish />
               <DeadCatfish />
+              <TotalCatfish />
             </div>
           </div>
 
@@ -95,6 +95,8 @@ export default function Homepage({ setAuth }) {
           <div>
             <p className="text-2xl font-bold mb-4">Alert Notifications</p>
             <AlertBox alerts={alerts} removeAlert={removeAlert} />
+            <p className="text-2xl font-bold my-4">Image Notifications</p>
+            <PictureBox />
           </div>
 
           {/* Graph Components */}
@@ -104,6 +106,7 @@ export default function Homepage({ setAuth }) {
               <LineGraphTemp />
               <LineGraphOxygen />
               <LineGraphPH />
+              <LineGraphTurb />
             </div>
           </div>
 

@@ -25,19 +25,27 @@ export const LineGraphOxygen = () => {
   const [oxygenData, setOxygenData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("weekly"); // default filter is 'weekly'
+  const [selectedDate, setSelectedDate] = useState(""); // state to store selected date
+  const [weekStart, setWeekStart] = useState(""); // state to store selected week start date
 
   useEffect(() => {
     const fetchOxygenData = async () => {
       try {
-        const response = await fetch(
-          `http://127.0.0.1:5000/weekly-oxygen-data?filter=${filter}`
-        );
+        let url = `http://127.0.0.1:5000/filtered-oxygen-data?filter=${filter}`;
+
+        // Append the selected date or week start to the request if available
+        if (filter === "date" && selectedDate) {
+          url += `&selected_date=${selectedDate}`;
+        } else if (filter === "week" && weekStart) {
+          url += `&week_start=${weekStart}`;
+        }
+
+        const response = await fetch(url);
         const data = await response.json();
 
-        console.log("Fetched data:", data);
+        console.log("Fetched oxygen data:", data);
 
         const processedData = processOxygenData(data);
-
         setOxygenData(processedData);
         setLoading(false);
       } catch (error) {
@@ -46,7 +54,7 @@ export const LineGraphOxygen = () => {
       }
     };
     fetchOxygenData();
-  }, [filter]); // refetch data when filter changes
+  }, [filter, selectedDate, weekStart]); // refetch data when filter, selectedDate, or weekStart changes
 
   const processOxygenData = (data) => {
     const labels =
@@ -62,7 +70,7 @@ export const LineGraphOxygen = () => {
             "Sunday",
           ];
     const oxygenLevels =
-      filter === "3hours" ? [] : [50, 40, 30, 20, 10, 0].map(() => []);
+      filter === "3hours" ? [] : [5, 4, 3, 2, 1, 0].map(() => []);
 
     const dailyOxygenLevels = Array(7)
       .fill(0)
@@ -70,16 +78,16 @@ export const LineGraphOxygen = () => {
 
     data.forEach((entry) => {
       const date = new Date(entry.timeData);
-      const oxygenLevel = entry.oxygen_level;
+      const oxygen = entry.oxygen;
 
       if (filter === "3hours") {
         const timeLabel = `${date.getHours()}:00 ${date.toLocaleDateString()}`;
         labels.push(timeLabel);
-        oxygenLevels.push(oxygenLevel);
+        oxygenLevels.push(oxygen);
       } else {
         const dayIndex = date.getDay();
         if (dayIndex >= 1) {
-          dailyOxygenLevels[dayIndex - 1].push(oxygenLevel);
+          dailyOxygenLevels[dayIndex - 1].push(oxygen);
         }
       }
     });
@@ -87,7 +95,7 @@ export const LineGraphOxygen = () => {
     const avgOxygenLevels = dailyOxygenLevels.map((oxygenArray) => {
       if (oxygenArray.length === 0) return 0;
       return (
-        oxygenArray.reduce((sum, oxygenLevel) => sum + oxygenLevel, 0) /
+        oxygenArray.reduce((sum, oxygen) => sum + oxygen, 0) /
         oxygenArray.length
       );
     });
@@ -108,12 +116,10 @@ export const LineGraphOxygen = () => {
       datasets: [
         {
           label:
-            filter === "3hours"
-              ? "Oxygen Levels Every 3 Hours"
-              : "Average Oxygen Levels",
+            filter === "3hours" ? "Oxygen Every 3 Hours" : "Average Oxygen",
           data: filter === "3hours" ? oxygenLevels : avgOxygenLevels,
           fill: false,
-          borderColor: "green",
+          borderColor: "#00C2FF",
           tension: 0.1,
         },
       ],
@@ -129,9 +135,7 @@ export const LineGraphOxygen = () => {
       title: {
         display: true,
         text:
-          filter === "3hours"
-            ? "Oxygen Levels Every 3 Hours"
-            : "Weekly Oxygen Levels",
+          filter === "3hours" ? "Oxygen Every 3 Hours" : "Weekly Oxygen Levels",
       },
     },
   };
@@ -145,8 +149,34 @@ export const LineGraphOxygen = () => {
         <select value={filter} onChange={(e) => setFilter(e.target.value)}>
           <option value="weekly">Weekly</option>
           <option value="3hours">Every 3 Hours</option>
+          <option value="date">By Date</option>
+          <option value="week">By Week</option>
         </select>
       </div>
+
+      {/* Show input fields based on selected filter */}
+      {filter === "date" && (
+        <div className="mb-4">
+          <label>Select Date: </label>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+          />
+        </div>
+      )}
+
+      {filter === "week" && (
+        <div className="mb-4">
+          <label>Select Week Start (Sunday): </label>
+          <input
+            type="date"
+            value={weekStart}
+            onChange={(e) => setWeekStart(e.target.value)}
+          />
+        </div>
+      )}
+
       {oxygenData.labels.length > 0 ? (
         <Line options={options} data={oxygenData} />
       ) : (
