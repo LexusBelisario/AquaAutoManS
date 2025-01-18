@@ -497,7 +497,7 @@ def check_dead_catfish():
             ph_status = "The Water was Normal pH Level"
         elif 7.6 <= latest_record.phlevel <= 8.9:
             ph_status = "The Water was Alkaline"
-            ph_possibilities.extend("Saltwater")
+            ph_possibilities.extend(["Saltwater, Baking Soda"])
         elif latest_record.phlevel > 9:
             ph_status = "The Water was Very Alkaline"
             ph_possibilities.extend(["Dishwashing Liquid", "Ammonia Solution", "Bleach", "Soap"])
