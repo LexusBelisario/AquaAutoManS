@@ -14,6 +14,7 @@ import logging
 import threading
 import time
 from PIL import Image
+from flask_socketio import SocketIO, emit
 
 active = True 
 
@@ -21,6 +22,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/dbserial'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -40,6 +42,14 @@ class aquamans(db.Model):
     dead_catfish = db.Column(db.Float, default=0)
     timeData = db.Column(db.DateTime, default=datetime.utcnow)
     dead_catfish_image = db.Column(db.LargeBinary, nullable=True)
+    
+# Emit detection data
+def send_detection_data(data):
+    socketio.emit('detection_data', data)
+
+# Emit image data
+def send_image_data(image_data):
+    socketio.emit('image_data', image_data)
     
 def periodic_sleep():
     """
@@ -72,6 +82,9 @@ def sensitive_task():
     if not active:
         return jsonify({'status': 'inactive', 'message': 'System is in rest mode. Try again later.'}), 503
     return jsonify({'status': 'success', 'message': 'Task executed successfully.'})
+
+
+
 
 @app.route('/temperature', methods=['GET'])
 def get_temperature():
@@ -390,6 +403,11 @@ def update_sensor_data():
         logging.error(f"Error updating sensor data: {e}")
         return jsonify({'status': 'failure', 'error': str(e)})
 
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+    logging.info('Client connected via Socket.IO')
+
 @app.route('/update_detection', methods=['POST'])
 def update_detection():
     try:
@@ -402,6 +420,7 @@ def update_detection():
             latest_record.catfish = catfish_count
             latest_record.dead_catfish = dead_catfish_count
             db.session.commit()
+            socketio.emit('detection_data', data)
             return jsonify({'status': 'success', 'message': 'Detection data updated'})
         else:
             return jsonify({'status': 'failure', 'message': 'No record to update'})
@@ -882,6 +901,9 @@ def latest_image():
         return jsonify({'message': 'No image available'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+if __name__ == '__main__':
+    socketio.run(app, host='0.0.0.0', port=5000)
 
 if __name__ == '__main__':
     app.run(debug=True)

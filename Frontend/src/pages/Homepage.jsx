@@ -10,7 +10,7 @@ import DeadCatfish from "../components/deadCatfish";
 import TotalCatfish from "../components/totalCatfish";
 import AlertBox from "../components/alertBox";
 import PictureBox from "../components/pictureBox";
-import LiveMonitoring from "../pages/LiveMonitoring";
+import LiveFeed from "../pages/LiveFeed";
 import { LineGraphTemp } from "../graphs/lineGraphTemp";
 import { LineGraphOxygen } from "../graphs/lineGraphOxy";
 import { LineGraphPH } from "../graphs/lineGraphPH";
@@ -115,7 +115,7 @@ export default function Homepage({ setAuth }) {
             {" "}
             <p className="text-2xl font-bold mb-8">Live Monitoring</p>
             <div className="min-h-screen bg-[#F0F8FF] overflow-hidden">
-              <LiveMonitoring />
+              <LiveFeed />
             </div>
           </div>
         </div>
