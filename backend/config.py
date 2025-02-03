@@ -43,14 +43,6 @@ class aquamans(db.Model):
     timeData = db.Column(db.DateTime, default=datetime.utcnow)
     dead_catfish_image = db.Column(db.LargeBinary, nullable=True)
     
-# Emit detection data
-def send_detection_data(data):
-    socketio.emit('detection_data', data)
-
-# Emit image data
-def send_image_data(image_data):
-    socketio.emit('image_data', image_data)
-    
 def periodic_sleep():
     """
     """
@@ -75,16 +67,117 @@ def some_background_task():
         time.sleep(60)
 
 sleep_thread = threading.Thread(target=periodic_sleep, daemon=True)
-sleep_thread.start()    
+sleep_thread.start()
+class WaterCondition:
+    def __init__(self):
+        self.notifications = []
+
+    def check_conditions(self, temperature, ph_level, oxygen_level, turbidity):
+        timestamp = datetime.now()
+        notification = {
+            'id': len(self.notifications) + 1,
+            'timestamp': timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            'dismissed': False,
+            'conditions': []
+        }
+
+        # Temperature check
+        if temperature < 20:
+            notification['conditions'].append({
+                'parameter': 'Temperature',
+                'value': temperature,
+                'status': 'Below Average',
+                'message': 'Temperature is too low'
+            })
+        elif temperature > 32:
+            notification['conditions'].append({
+                'parameter': 'Temperature',
+                'value': temperature,
+                'status': 'Critical',
+                'message': 'Temperature is too high'
+            })
+
+        # pH Level check
+        if ph_level < 6:
+            notification['conditions'].append({
+                'parameter': 'pH Level',
+                'value': ph_level,
+                'status': 'Below Average',
+                'message': 'Water is too acidic'
+            })
+        elif ph_level > 8:
+            notification['conditions'].append({
+                'parameter': 'pH Level',
+                'value': ph_level,
+                'status': 'Critical',
+                'message': 'Water is too alkaline'
+            })
+
+        # Oxygen Level check
+        if oxygen_level < 3:
+            notification['conditions'].append({
+                'parameter': 'Oxygen Level',
+                'value': oxygen_level,
+                'status': 'Critical',
+                'message': 'Oxygen level is critically low'
+            })
+        elif oxygen_level < 5:
+            notification['conditions'].append({
+                'parameter': 'Oxygen Level',
+                'value': oxygen_level,
+                'status': 'Below Average',
+                'message': 'Oxygen level is low'
+            })
+
+        # Turbidity check
+        if turbidity > 50:
+            notification['conditions'].append({
+                'parameter': 'Turbidity',
+                'value': turbidity,
+                'status': 'Critical',
+                'message': 'Water is too turbid'
+            })
+
+        if notification['conditions']:
+            self.notifications.append(notification)
+            return notification
+        return None
+
+water_monitor = WaterCondition()
+
+@app.route('/api/check-conditions', methods=['POST'])
+def check_conditions():
+    # Example values - replace with actual sensor data
+    temperature = 35
+    ph_level = 9
+    oxygen_level = 2
+    turbidity = 60
+
+    notification = water_monitor.check_conditions(temperature, ph_level, oxygen_level, turbidity)
+    if notification:
+        return jsonify(notification)
+    return jsonify({'message': 'All conditions normal'})
+
+@app.route('/api/notifications', methods=['GET'])
+def get_notifications():
+    return jsonify(water_monitor.notifications)
+
+@app.route('/api/dismiss-notification/<int:notification_id>', methods=['POST'])
+def dismiss_notification(notification_id):
+    for notification in water_monitor.notifications:
+        if notification['id'] == notification_id:
+            notification['dismissed'] = True
+            return jsonify({'message': 'Notification dismissed'})
+    return jsonify({'message': 'Notification not found'}), 404
+
+if __name__ == '__main__':
+    app.run(debug=True)
 
 @app.route('/some-sensitive-task', methods=['GET'])
 def sensitive_task():
     if not active:
         return jsonify({'status': 'inactive', 'message': 'System is in rest mode. Try again later.'}), 503
     return jsonify({'status': 'success', 'message': 'Task executed successfully.'})
-
-
-
 
 @app.route('/temperature', methods=['GET'])
 def get_temperature():
@@ -403,11 +496,6 @@ def update_sensor_data():
         logging.error(f"Error updating sensor data: {e}")
         return jsonify({'status': 'failure', 'error': str(e)})
 
-@socketio.on('connect')
-def handle_connect():
-    print('Client connected')
-    logging.info('Client connected via Socket.IO')
-
 @app.route('/update_detection', methods=['POST'])
 def update_detection():
     try:
@@ -420,7 +508,6 @@ def update_detection():
             latest_record.catfish = catfish_count
             latest_record.dead_catfish = dead_catfish_count
             db.session.commit()
-            socketio.emit('detection_data', data)
             return jsonify({'status': 'success', 'message': 'Detection data updated'})
         else:
             return jsonify({'status': 'failure', 'message': 'No record to update'})
@@ -902,8 +989,20 @@ def latest_image():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
+def send_detection_data(data):
+    socketio.emit('detection_data', data)
+
+def send_image_data(image_data):
+    socketio.emit('image_data', image_data)
+
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000)
 
 if __name__ == '__main__':
     app.run(debug=True)
+    
+    
