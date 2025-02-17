@@ -1,0 +1,102 @@
+2025-02-04 23:55:31,058 - INFO - Starting detection system...
+2025-02-04 23:55:38,064 - INFO - Data sent successfully: {'data': {'catfish': 48, 'dead_catfish': 0}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:55:38,064 - INFO - Detection data sent - Catfish: 48, Dead: 0
+2025-02-04 23:55:41,376 - INFO - Data sent successfully: {'data': {'catfish': 40, 'dead_catfish': 2}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:55:41,377 - INFO - Detection data sent - Catfish: 40, Dead: 2
+2025-02-04 23:55:41,418 - INFO - Successfully inserted data into database
+2025-02-04 23:55:41,420 - INFO - Database updated with new detection data
+2025-02-04 23:55:44,505 - INFO - Data sent successfully: {'data': {'catfish': 72, 'dead_catfish': 3}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:55:44,506 - INFO - Detection data sent - Catfish: 72, Dead: 3
+2025-02-04 23:55:47,646 - INFO - Data sent successfully: {'data': {'catfish': 46, 'dead_catfish': 0}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:55:47,646 - INFO - Detection data sent - Catfish: 46, Dead: 0
+2025-02-04 23:55:52,064 - INFO - Data sent successfully: {'data': {'catfish': 41, 'dead_catfish': 3}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:55:52,065 - INFO - Detection data sent - Catfish: 41, Dead: 3
+2025-02-04 23:55:55,346 - INFO - Data sent successfully: {'data': {'catfish': 53, 'dead_catfish': 2}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:55:55,347 - INFO - Detection data sent - Catfish: 53, Dead: 2
+2025-02-04 23:55:59,395 - INFO - Data sent successfully: {'data': {'catfish': 33, 'dead_catfish': 4}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:55:59,395 - INFO - Detection data sent - Catfish: 33, Dead: 4
+2025-02-04 23:56:04,081 - INFO - Data sent successfully: {'data': {'catfish': 44, 'dead_catfish': 0}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:04,082 - INFO - Detection data sent - Catfish: 44, Dead: 0
+2025-02-04 23:56:08,337 - INFO - Data sent successfully: {'data': {'catfish': 15, 'dead_catfish': 27}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:08,337 - INFO - Detection data sent - Catfish: 15, Dead: 27
+2025-02-04 23:56:08,354 - INFO - Successfully inserted data into database
+2025-02-04 23:56:08,354 - INFO - Database updated with new detection data
+2025-02-04 23:56:12,115 - INFO - Data sent successfully: {'data': {'catfish': 72, 'dead_catfish': 1}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:12,115 - INFO - Detection data sent - Catfish: 72, Dead: 1
+2025-02-04 23:56:16,401 - INFO - Data sent successfully: {'data': {'catfish': 14, 'dead_catfish': 34}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:16,402 - INFO - Detection data sent - Catfish: 14, Dead: 34
+2025-02-04 23:56:20,382 - INFO - Data sent successfully: {'data': {'catfish': 22, 'dead_catfish': 0}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:20,382 - INFO - Detection data sent - Catfish: 22, Dead: 0
+2025-02-04 23:56:23,994 - INFO - Data sent successfully: {'data': {'catfish': 39, 'dead_catfish': 1}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:23,994 - INFO - Detection data sent - Catfish: 39, Dead: 1
+2025-02-04 23:56:27,582 - INFO - Data sent successfully: {'data': {'catfish': 46, 'dead_catfish': 1}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:27,582 - INFO - Detection data sent - Catfish: 46, Dead: 1
+2025-02-04 23:56:31,052 - INFO - Data sent successfully: {'data': {'catfish': 49, 'dead_catfish': 3}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:31,052 - INFO - Detection data sent - Catfish: 49, Dead: 3
+2025-02-04 23:56:31,072 - INFO - Successfully inserted data into database
+2025-02-04 23:56:31,072 - INFO - Database updated with new detection data
+2025-02-04 23:56:34,087 - INFO - Data sent successfully: {'data': {'catfish': 77, 'dead_catfish': 0}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:34,088 - INFO - Detection data sent - Catfish: 77, Dead: 0
+2025-02-04 23:56:37,257 - INFO - Data sent successfully: {'data': {'catfish': 46, 'dead_catfish': 0}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:37,257 - INFO - Detection data sent - Catfish: 46, Dead: 0
+2025-02-04 23:56:40,563 - INFO - Data sent successfully: {'data': {'catfish': 117, 'dead_catfish': 29}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:40,563 - INFO - Detection data sent - Catfish: 117, Dead: 29
+2025-02-04 23:56:43,955 - INFO - Data sent successfully: {'data': {'catfish': 53, 'dead_catfish': 0}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:43,956 - INFO - Detection data sent - Catfish: 53, Dead: 0
+2025-02-04 23:56:47,228 - INFO - Data sent successfully: {'data': {'catfish': 70, 'dead_catfish': 17}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:47,229 - INFO - Detection data sent - Catfish: 70, Dead: 17
+2025-02-04 23:56:50,600 - INFO - Data sent successfully: {'data': {'catfish': 42, 'dead_catfish': 1}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:50,601 - INFO - Detection data sent - Catfish: 42, Dead: 1
+2025-02-04 23:56:53,778 - INFO - Data sent successfully: {'data': {'catfish': 35, 'dead_catfish': 2}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:53,778 - INFO - Detection data sent - Catfish: 35, Dead: 2
+2025-02-04 23:56:53,795 - INFO - Successfully inserted data into database
+2025-02-04 23:56:53,795 - INFO - Database updated with new detection data
+2025-02-04 23:56:56,957 - INFO - Data sent successfully: {'data': {'catfish': 73, 'dead_catfish': 0}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:56:56,957 - INFO - Detection data sent - Catfish: 73, Dead: 0
+2025-02-04 23:57:00,156 - INFO - Data sent successfully: {'data': {'catfish': 51, 'dead_catfish': 15}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:00,157 - INFO - Detection data sent - Catfish: 51, Dead: 15
+2025-02-04 23:57:03,449 - INFO - Data sent successfully: {'data': {'catfish': 33, 'dead_catfish': 0}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:03,450 - INFO - Detection data sent - Catfish: 33, Dead: 0
+2025-02-04 23:57:06,800 - INFO - Data sent successfully: {'data': {'catfish': 48, 'dead_catfish': 5}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:06,801 - INFO - Detection data sent - Catfish: 48, Dead: 5
+2025-02-04 23:57:10,225 - INFO - Data sent successfully: {'data': {'catfish': 76, 'dead_catfish': 2}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:10,225 - INFO - Detection data sent - Catfish: 76, Dead: 2
+2025-02-04 23:57:14,165 - INFO - Data sent successfully: {'data': {'catfish': 79, 'dead_catfish': 1}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:14,166 - INFO - Detection data sent - Catfish: 79, Dead: 1
+2025-02-04 23:57:14,181 - INFO - Successfully inserted data into database
+2025-02-04 23:57:14,182 - INFO - Database updated with new detection data
+2025-02-04 23:57:17,395 - INFO - Data sent successfully: {'data': {'catfish': 84, 'dead_catfish': 12}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:17,395 - INFO - Detection data sent - Catfish: 84, Dead: 12
+2025-02-04 23:57:20,492 - INFO - Data sent successfully: {'data': {'catfish': 135, 'dead_catfish': 31}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:20,492 - INFO - Detection data sent - Catfish: 135, Dead: 31
+2025-02-04 23:57:23,396 - INFO - Data sent successfully: {'data': {'catfish': 127, 'dead_catfish': 6}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:23,396 - INFO - Detection data sent - Catfish: 127, Dead: 6
+2025-02-04 23:57:27,077 - INFO - Data sent successfully: {'data': {'catfish': 65, 'dead_catfish': 34}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:27,078 - INFO - Detection data sent - Catfish: 65, Dead: 34
+2025-02-04 23:57:30,118 - INFO - Data sent successfully: {'data': {'catfish': 47, 'dead_catfish': 15}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:30,118 - INFO - Detection data sent - Catfish: 47, Dead: 15
+2025-02-04 23:57:33,684 - INFO - Data sent successfully: {'data': {'catfish': 139, 'dead_catfish': 2}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:33,684 - INFO - Detection data sent - Catfish: 139, Dead: 2
+2025-02-04 23:57:37,170 - INFO - Data sent successfully: {'data': {'catfish': 36, 'dead_catfish': 0}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:37,170 - INFO - Detection data sent - Catfish: 36, Dead: 0
+2025-02-04 23:57:40,269 - INFO - Data sent successfully: {'data': {'catfish': 119, 'dead_catfish': 8}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:40,270 - INFO - Detection data sent - Catfish: 119, Dead: 8
+2025-02-04 23:57:40,284 - INFO - Successfully inserted data into database
+2025-02-04 23:57:40,285 - INFO - Database updated with new detection data
+2025-02-04 23:57:43,529 - INFO - Data sent successfully: {'data': {'catfish': 215, 'dead_catfish': 2}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:43,530 - INFO - Detection data sent - Catfish: 215, Dead: 2
+2025-02-04 23:57:47,375 - INFO - Data sent successfully: {'data': {'catfish': 34, 'dead_catfish': 0}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:47,375 - INFO - Detection data sent - Catfish: 34, Dead: 0
+2025-02-04 23:57:50,495 - INFO - Data sent successfully: {'data': {'catfish': 235, 'dead_catfish': 19}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:50,496 - INFO - Detection data sent - Catfish: 235, Dead: 19
+2025-02-04 23:57:54,093 - INFO - Data sent successfully: {'data': {'catfish': 50, 'dead_catfish': 0}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:54,094 - INFO - Detection data sent - Catfish: 50, Dead: 0
+2025-02-04 23:57:57,289 - INFO - Data sent successfully: {'data': {'catfish': 106, 'dead_catfish': 3}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:57:57,290 - INFO - Detection data sent - Catfish: 106, Dead: 3
+2025-02-04 23:58:00,646 - INFO - Data sent successfully: {'data': {'catfish': 53, 'dead_catfish': 0}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:58:00,647 - INFO - Detection data sent - Catfish: 53, Dead: 0
+2025-02-04 23:58:05,117 - INFO - Data sent successfully: {'data': {'catfish': 46, 'dead_catfish': 3}, 'message': 'Detection data updated', 'status': 'success'}
+2025-02-04 23:58:05,117 - INFO - Detection data sent - Catfish: 46, Dead: 3
+2025-02-04 23:58:05,134 - INFO - Successfully inserted data into database
+2025-02-04 23:58:05,135 - INFO - Database updated with new detection data
+2025-02-04 23:58:05,767 - INFO - Resources released. Program terminated.
