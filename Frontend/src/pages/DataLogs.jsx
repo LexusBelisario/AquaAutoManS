@@ -142,49 +142,52 @@ export default function DataLogs({ setAuth }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        let url = "http://localhost:5000/data"; // Default URL
-
-        // If a date is selected, append it to the URL
+        let url = "http://localhost:5000/data";
         if (filterDate) {
           url += `?date=${filterDate}`;
         }
-
         const response = await axios.get(url);
-        console.log("Data fetched from backend:", response.data); // Log the full data
-
-        setData(response.data);
-        applyFilter(response.data);
+        
+        // Ensure response.data.data is an array
+        if (!Array.isArray(response.data.data)) {
+          console.error("Error: Data is not an array!", response.data);
+          return;
+        }
+  
+        console.log("Fetched data array:", response.data.data); // Debugging log
+  
+        setData(response.data.data); // Use response.data.data instead of response.data
+        applyFilter(response.data.data);
       } catch (error) {
         console.error("Error fetching data:", error);
       }
     };
-
-    fetchData(); // Fetch data when the component mounts
-    const intervalId = setInterval(fetchData, 5000); // Poll every 5 seconds
-    return () => clearInterval(intervalId); // Cleanup on unmount
-  }, [filterDate]); // Trigger fetchData when filterDate changes
+  
+    fetchData();
+    const intervalId = setInterval(fetchData, 5000);
+    return () => clearInterval(intervalId);
+  }, [filterDate]);
+  
 
   const applyFilter = (dataToFilter) => {
+    if (!Array.isArray(dataToFilter)) {
+      console.error("applyFilter received non-array data:", dataToFilter);
+      return;
+    }
+  
     if (filterDate) {
-      // Convert filterDate to the format YYYY-MM-DD (it should already be, but we'll ensure it)
       const formattedFilterDate = filterDate;
-
       const filtered = dataToFilter.filter((row) => {
-        // Extract the date part only (YYYY-MM-DD) from the full date-time string
         const rowDate = new Date(row.timeData).toISOString().split("T")[0];
-
-        // Log for debugging
-        console.log(
-          `Comparing rowDate: ${rowDate} with formattedFilterDate: ${formattedFilterDate}`
-        );
-
-        return rowDate === formattedFilterDate; // Ensure we only compare the date part (YYYY-MM-DD)
+        return rowDate === formattedFilterDate;
       });
-      setFilteredData(filtered); // Set the filtered data
+  
+      setFilteredData(filtered);
     } else {
-      setFilteredData(dataToFilter); // Show all data if no date is selected
+      setFilteredData(dataToFilter);
     }
   };
+  
 
   const handleDateChange = (e) => {
     const selectedDate = e.target.value;

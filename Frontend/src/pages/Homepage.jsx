@@ -10,13 +10,11 @@ import DeadCatfish from "../components/deadCatfish";
 import TotalCatfish from "../components/totalCatfish";
 import AlertBox from "../components/alertBox";
 import PictureBox from "../components/pictureBox";
-import LiveFeed from "./LiveVideoFeed";
 import { LineGraphTemp } from "../graphs/lineGraphTemp";
 import { LineGraphOxygen } from "../graphs/lineGraphOxy";
 import { LineGraphPH } from "../graphs/lineGraphPH";
 import { LineGraphTurb } from "../graphs/lineGraphTurb";
 import axios from "axios";
-import WaterMonitor from "../components/NotificationBox";
 
 export default function Homepage({ setAuth }) {
   const [alerts, setAlerts] = useState([]);
@@ -94,9 +92,7 @@ export default function Homepage({ setAuth }) {
 
           {/* Alert Box */}
           <div>
-            <p className="text-2xl font-bold">Water Notifications</p>
-            <WaterMonitor />
-            <p className="text-2xl font-bold mt-4">Alert Notifications</p>
+            <p className="text-2xl font-bold mb-4">Alert Notifications</p>
             <AlertBox alerts={alerts} removeAlert={removeAlert} />
             <p className="text-2xl font-bold my-4">Image Notifications</p>
             <PictureBox />
@@ -118,7 +114,7 @@ export default function Homepage({ setAuth }) {
             {" "}
             <p className="text-2xl font-bold mb-8">Live Monitoring</p>
             <div className="min-h-screen bg-[#F0F8FF] overflow-hidden">
-              <LiveFeed />
+              sdsd
             </div>
           </div>
         </div>
