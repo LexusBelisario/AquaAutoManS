@@ -1,32 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import fish from "../images/fishCat.svg";
+import { useSensorData } from "../context/WebSocketContext";
 
 export default function AliveCatfish() {
-  const [aliveCount, setAliveCount] = useState(0);
+  const sensorData = useSensorData();
   const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchAliveCount = async () => {
-      try {
-        const response = await fetch("http://localhost:5000/catfish");
-        const data = await response.json();
-        if (data.status === 'success') {
-          setAliveCount(data.catfish || 0);
-          setError(null);
-        } else {
-          setError('Failed to fetch data');
-        }
-      } catch (error) {
-        console.error("Error fetching alive catfish count:", error);
-        setError('Failed to fetch data');
-      }
-    };
-
-    fetchAliveCount();
-    const interval = setInterval(fetchAliveCount, 2000);
-
-    return () => clearInterval(interval);
-  }, []);
+    if (sensorData) {
+      setIsLoading(false);
+      setError(null);
+    } else {
+      setError("Connection error");
+    }
+  }, [sensorData]);
 
   return (
     <div className="bg-slate-50 rounded-md border p-4 border-gray-100 shadow-md h-40 w-72 relative">
@@ -37,10 +25,14 @@ export default function AliveCatfish() {
           <img className="w-8 h-8" src={fish} alt="Alive Pic" />
         </div>
         <div className="flex justify-end mt-2">
-          {error ? (
-            <p className="text-red-500 text-sm">Error loading data</p>
+          {isLoading ? (
+            <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
+          ) : error ? (
+            <p className="text-red-500 text-sm">{error}</p>
           ) : (
-            <p className="text-black font-semibold text-4xl">{aliveCount}</p>
+            <p className="text-black font-semibold text-4xl">
+              {sensorData.catfish || 0}
+            </p>
           )}
         </div>
       </div>
