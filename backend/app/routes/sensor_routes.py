@@ -69,3 +69,45 @@ def update_detection():
     except Exception as e:
         logging.error(f"Error updating detection data: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@bp.route('/catfish', methods=['GET'])
+@limiter.exempt
+def get_catfish():
+    try:
+        latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()
+        if latest_record:
+            return jsonify({
+                'status': 'success',
+                'catfish': latest_record.catfish
+            })
+        return jsonify({
+            'status': 'error',
+            'catfish': 0
+        })
+    except Exception as e:
+        logging.error(f"Error fetching catfish count: {e}")
+        return jsonify({
+            'status': 'error',
+            'catfish': 0
+        })
+
+@bp.route('/dead_catfish', methods=['GET'])
+@limiter.exempt
+def get_dead_catfish():
+    try:
+        latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()
+        if latest_record:
+            return jsonify({
+                'status': 'success',
+                'dead_catfish': latest_record.dead_catfish
+            })
+        return jsonify({
+            'status': 'error',
+            'dead_catfish': 0
+        })
+    except Exception as e:
+        logging.error(f"Error fetching dead catfish count: {e}")
+        return jsonify({
+            'status': 'error',
+            'dead_catfish': 0
+        })
