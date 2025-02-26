@@ -1,20 +1,26 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import fish from "../images/fishCat.svg";
-import { useSensorData } from "../context/WebSocketContext";
 
 export default function AliveCatfish() {
-  const sensorData = useSensorData();
-  const [error, setError] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [aliveCount, setAliveCount] = useState(0);
 
   useEffect(() => {
-    if (sensorData) {
-      setIsLoading(false);
-      setError(null);
-    } else {
-      setError("Connection error");
-    }
-  }, [sensorData]);
+    const fetchAliveCount = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/data"); // Update with your API endpoint
+        const data = await response.json();
+        const latestRecord = data[data.length - 1];
+        setAliveCount(latestRecord.catfish || 0);
+      } catch (error) {
+        console.error("Error fetching alive catfish count:", error);
+      }
+    };
+
+    fetchAliveCount();
+    const interval = setInterval(fetchAliveCount, 2000); // Refresh every 5 seconds
+
+    return () => clearInterval(interval); // Cleanup on component unmount
+  }, []);
 
   return (
     <div className="bg-slate-50 rounded-md border p-4 border-gray-100 shadow-md h-40 w-72 relative">
@@ -25,15 +31,7 @@ export default function AliveCatfish() {
           <img className="w-8 h-8" src={fish} alt="Alive Pic" />
         </div>
         <div className="flex justify-end mt-2">
-          {isLoading ? (
-            <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
-          ) : error ? (
-            <p className="text-red-500 text-sm">{error}</p>
-          ) : (
-            <p className="text-black font-semibold text-4xl">
-              {sensorData.catfish || 0}
-            </p>
-          )}
+          <p className="text-black font-semibold text-4xl">{aliveCount}</p>
         </div>
       </div>
     </div>

@@ -1,4 +1,3 @@
-
 from flask import jsonify, send_file
 from app.models import aquamans
 from app import db
@@ -10,45 +9,116 @@ from io import BytesIO
 from PIL import Image
 
 class DataService:
-    def get_data(self, date_filter):
+    def get_data(self, date_filter=None, page=1, per_page=100):
         try:
-            if date_filter:
-                try:
-                    filter_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
-                except ValueError:
-                    return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
-            else:
-                filter_date = None
+            # Calculate offset
+            offset = (page - 1) * per_page
 
             with db.engine.connect() as connection:
-                if filter_date:
+                # Base query with pagination
+                if date_filter:
+                    # Convert date_filter to datetime
+                    filter_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
+                    
+                    # Parameterized query with pagination
                     query = """
-                        SELECT * FROM aquamans
+                        SELECT 
+                            id, 
+                            temperature, 
+                            tempResult, 
+                            oxygen, 
+                            oxygenResult, 
+                            phlevel, 
+                            phResult, 
+                            turbidity, 
+                            turbidityResult, 
+                            catfish, 
+                            dead_catfish, 
+                            timeData 
+                        FROM aquamans 
+                        WHERE DATE(timeData) = :filter_date 
+                        ORDER BY timeData DESC
+                        LIMIT :per_page OFFSET :offset
+                    """
+                    result = connection.execute(text(query), {
+                        'filter_date': filter_date,
+                        'per_page': per_page,
+                        'offset': offset
+                    })
+
+                    # Count total records for the date
+                    count_query = """
+                        SELECT COUNT(*) as total 
+                        FROM aquamans 
                         WHERE DATE(timeData) = :filter_date
                     """
-                    result = connection.execute(text(query), {'filter_date': filter_date})
-                else:
-                    query = "SELECT * FROM aquamans"
-                    result = connection.execute(text(query))
+                    total_result = connection.execute(text(count_query), {
+                        'filter_date': filter_date
+                    })
+                    total_records = total_result.scalar()
 
+                else:
+                    # Get paginated records if no date filter
+                    query = """
+                        SELECT 
+                            id, 
+                            temperature, 
+                            tempResult, 
+                            oxygen, 
+                            oxygenResult, 
+                            phlevel, 
+                            phResult, 
+                            turbidity, 
+                            turbidityResult, 
+                            catfish, 
+                            dead_catfish, 
+                            timeData 
+                        FROM aquamans 
+                        ORDER BY timeData DESC
+                        LIMIT :per_page OFFSET :offset
+                    """
+                    result = connection.execute(text(query), {
+                        'per_page': per_page,
+                        'offset': offset
+                    })
+
+                    # Count total records
+                    count_query = "SELECT COUNT(*) as total FROM aquamans"
+                    total_result = connection.execute(text(count_query))
+                    total_records = total_result.scalar()
+
+                # Get column names
+                columns = result.keys()
+
+                # Convert results to list of dictionaries
                 records = []
                 for row in result:
-                    record = dict(zip(result.keys(), row))
+                    record = {
+                        col: getattr(row, col) for col in columns
+                    }
                     
-                    for key, value in record.items():
-                        if isinstance(value, bytes):
-                            record[key] = base64.b64encode(value).decode('utf-8')
-
+                    # Convert datetime to ISO string if needed
+                    if 'timeData' in record and record['timeData']:
+                        record['timeData'] = record['timeData'].isoformat()
+                    
                     records.append(record)
 
-                if not records:
-                    return jsonify({"message": "No data found for the selected date."}), 404
-
-                return jsonify(records)
+                # Return results with pagination info
+                return jsonify({
+                    'data': records,
+                    'total': total_records,
+                    'page': page,
+                    'per_page': per_page,
+                    'total_pages': (total_records + per_page - 1) // per_page
+                })
 
         except Exception as e:
-            logging.error(f"Error fetching data: {e}")
-            return jsonify({'error': str(e)}), 500
+            logging.error(f"Error in get_data service: {str(e)}")
+            return jsonify({
+                'error': 'Internal server error',
+                'message': str(e),
+                'data': []
+            }), 500
 
     def get_temperature_data(self):
         try:

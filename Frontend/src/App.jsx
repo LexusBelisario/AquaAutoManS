@@ -5,7 +5,6 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/loginPage.jsx";
 import Logs from "./pages/DataLogs.jsx";
 import AboutUs from "./pages/AboutUs.jsx";
-import { WebSocketProvider } from "./context/WebSocketContext";
 
 export default function App() {
   const [auth, setAuth] = useState(() => {
@@ -25,9 +24,7 @@ export default function App() {
           path="/main"
           element={
             <ProtectedRoute auth={auth}>
-              <WebSocketProvider>
-                <Home setAuth={setAuth} />
-              </WebSocketProvider>
+              <Home setAuth={setAuth} />
             </ProtectedRoute>
           }
         />
@@ -35,9 +32,7 @@ export default function App() {
           path="/logs"
           element={
             <ProtectedRoute auth={auth}>
-              <WebSocketProvider>
-                <Logs setAuth={setAuth} />
-              </WebSocketProvider>
+              <Logs setAuth={setAuth} />
             </ProtectedRoute>
           }
         />
@@ -45,9 +40,7 @@ export default function App() {
           path="/aboutus"
           element={
             <ProtectedRoute auth={auth}>
-              <WebSocketProvider>
-                <AboutUs setAuth={setAuth} />
-              </WebSocketProvider>
+              <AboutUs setAuth={setAuth} />
             </ProtectedRoute>
           }
         />

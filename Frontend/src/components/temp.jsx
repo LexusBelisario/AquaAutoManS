@@ -1,24 +1,28 @@
-import React, { useState, useEffect } from "react";
-import { useSensorData } from "../context/WebSocketContext";
+import React, { useEffect, useState } from "react";
 import normTemp from "../images/tempNorm.svg";
 import coldTemp from "../images/tempCold.svg";
 import hotTemp from "../images/tempHot.svg";
 import errorIcon from "../images/errorImg.svg";
 
 export default function Temp() {
-  const sensorData = useSensorData();
-  const temperature = sensorData.temperature;
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [temperature, setTemperature] = useState(null);
 
   useEffect(() => {
-    if (sensorData) {
-      setIsLoading(false);
-      setError(null);
-    } else {
-      setError("Connection error");
-    }
-  }, [sensorData]);
+    const fetchTemperature = async () => {
+      try {
+        const response = await fetch("http://127.0.0.1:5000/temperature");
+        const data = await response.json();
+        setTemperature(data.temperature);
+      } catch (error) {
+        console.error("Error fetching temperature data:", error);
+      }
+    };
+
+    fetchTemperature();
+
+    const interval = setInterval(fetchTemperature, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const getTemperatureStatus = () => {
     if (temperature >= 26 && temperature <= 32) {
@@ -68,27 +72,6 @@ export default function Temp() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="bg-slate-50 rounded-md border p-4 border-gray-100 shadow-md h-40 w-72 relative">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/2 mb-4"></div>
-          <div className="h-16 bg-gray-200 rounded"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-slate-50 rounded-md border p-4 border-gray-100 shadow-md h-40 w-72 relative">
-        <div className="flex items-center justify-center h-full">
-          <p className="text-red-500">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-slate-50 rounded-md border p-4 border-gray-100 shadow-md h-40 w-72 relative">
       <div
@@ -112,6 +95,7 @@ export default function Temp() {
             </div>
             <p className="text-black font-medium text-2xl mt-2">
               {getTemperatureStatus()}
+              {/* {temperature !== null ? `The water temperature is ${getTemperatureStatus()}` : ""} */}
             </p>
           </div>
         </div>
