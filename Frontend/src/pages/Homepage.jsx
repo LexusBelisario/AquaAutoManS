@@ -15,6 +15,7 @@ import { LineGraphOxygen } from "../graphs/lineGraphOxy";
 import { LineGraphPH } from "../graphs/lineGraphPH";
 import { LineGraphTurb } from "../graphs/lineGraphTurb";
 import axios from "axios";
+import LiveVideoFeed from "./LiveVideoFeed";
 
 export default function Homepage({ setAuth }) {
   const [alerts, setAlerts] = useState([]);
@@ -114,7 +115,7 @@ export default function Homepage({ setAuth }) {
             {" "}
             <p className="text-2xl font-bold mb-8">Live Monitoring</p>
             <div className="min-h-screen bg-[#F0F8FF] overflow-hidden">
-              sdsd
+              <LiveVideoFeed />
             </div>
           </div>
         </div>

@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_caching import Cache
 from app.utils.limiters import limiter
+from app.routes import video_routes
 
 db = SQLAlchemy()
 cache = Cache()
@@ -38,5 +39,6 @@ def create_app():
     app.register_blueprint(sensor_routes.bp)
     app.register_blueprint(data_routes.bp)
     app.register_blueprint(report_routes.bp)
+    app.register_blueprint(video_routes.video_bp, url_prefix='/video')
 
     return app

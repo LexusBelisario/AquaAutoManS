@@ -284,9 +284,54 @@ class ReportService:
             "Note: These conditions may have stressed the catfish(es). "
             "Please remove dead catfish immediately to prevent water contamination."
         )
+        
+    def _get_temp_status(self, temp):
+        if 26 <= temp <= 32:
+            return "Normal"
+        elif 20 < temp < 26:
+            return "Below Average"
+        elif temp <= 20:
+            return "Cold"
+        elif 32 <= temp < 35:
+            return "Above Average"
+        else:
+            return "Hot"
+
+    def _get_oxygen_status(self, oxy):
+        if oxy == 0:
+            return "Very Low"
+        elif oxy < 1.5:
+            return "Low"
+        elif 1.5 <= oxy <= 5:
+            return "Normal"
+        else:
+            return "High"
+
+    def _get_ph_status(self, ph):
+        if ph < 4:
+            return "Very Acidic"
+        elif 4 <= ph < 6:
+            return "Acidic"
+        elif 6 <= ph <= 7.5:
+            return "Normal"
+        elif 7.5 < ph <= 9:
+            return "Alkaline"
+        else:
+            return "Very Alkaline"
+
+    def _get_turbidity_status(self, turb):
+        if turb < 20:
+            return "Clean"
+        elif 20 <= turb < 50:
+            return "Cloudy"
+        else:
+            return "Dirty"
+
 
     def print_data_report(self, time_filter, date_filter):
         try:
+            logging.info(f"Starting report generation with time_filter: {time_filter}, date_filter: {date_filter}")
+            
             if time_filter > 0:
                 if date_filter:
                     filter_date = datetime.strptime(date_filter, "%Y-%m-%d")
@@ -307,6 +352,8 @@ class ReportService:
             
             end_time = filter_date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
+            logging.info(f"Querying data from {start_time} to {end_time}")
+
             recent_data = (
                 aquamans.query.filter(
                     aquamans.timeData >= start_time,
@@ -319,23 +366,7 @@ class ReportService:
             if not recent_data:
                 return jsonify({"message": "No records found in the selected time range."})
 
-            # Initialize analysis dictionaries
-            analysis = {
-                'temperature': {
-                    'normal': [], 'below_average': [], 'cold': [],
-                    'above_average': [], 'hot': []
-                },
-                'oxygen': {
-                    'very_low': [], 'low': [], 'normal': [], 'high': []
-                },
-                'ph': {
-                    'very_acidic': [], 'acidic': [], 'normal': [],
-                    'alkaline': [], 'very_alkaline': []
-                },
-                'turbidity': {
-                    'clean': [], 'cloudy': [], 'dirty': []
-                }
-            }
+            logging.info(f"Found {len(recent_data)} records")
 
             # Prepare data for PDF
             data = [["Time", "Temperature", "Result", "Oxygen", "Result", 
@@ -352,8 +383,8 @@ class ReportService:
                 'dead_catfish': 0
             }
 
+            # Process data
             for record in recent_data:
-                # Add to data table
                 time_str = record.timeData.strftime("%Y-%m-%d %H:%M:%S")
                 data.append([
                     time_str,
@@ -369,7 +400,6 @@ class ReportService:
                     str(record.dead_catfish)
                 ])
 
-                # Update totals
                 totals['temperature'] += float(record.temperature or 0)
                 totals['oxygen'] += float(record.oxygen or 0)
                 totals['phlevel'] += float(record.phlevel or 0)
@@ -378,61 +408,17 @@ class ReportService:
                 totals['dead_catfish'] += float(record.dead_catfish or 0)
                 totals['count'] += 1
 
-                # Analyze Temperature
-                temp = float(record.temperature)
-                if 26 <= temp <= 32:
-                    analysis['temperature']['normal'].append(time_str)
-                elif 20 < temp < 26:
-                    analysis['temperature']['below_average'].append(time_str)
-                elif temp <= 20:
-                    analysis['temperature']['cold'].append(time_str)
-                elif 32 <= temp < 35:
-                    analysis['temperature']['above_average'].append(time_str)
-                elif temp >= 35:
-                    analysis['temperature']['hot'].append(time_str)
-
-                # Analyze Oxygen
-                oxy = float(record.oxygen)
-                if oxy == 0:
-                    analysis['oxygen']['very_low'].append(time_str)
-                elif oxy < 1.5:
-                    analysis['oxygen']['low'].append(time_str)
-                elif 1.5 <= oxy <= 5:
-                    analysis['oxygen']['normal'].append(time_str)
-                elif oxy > 5:
-                    analysis['oxygen']['high'].append(time_str)
-
-                # Analyze pH
-                ph = float(record.phlevel)
-                if ph < 4:
-                    analysis['ph']['very_acidic'].append(time_str)
-                elif 4 <= ph < 6:
-                    analysis['ph']['acidic'].append(time_str)
-                elif 6 <= ph <= 7.5:
-                    analysis['ph']['normal'].append(time_str)
-                elif 7.5 < ph <= 9:
-                    analysis['ph']['alkaline'].append(time_str)
-                elif ph > 9:
-                    analysis['ph']['very_alkaline'].append(time_str)
-
-                # Analyze Turbidity
-                turb = float(record.turbidity)
-                if turb < 20:
-                    analysis['turbidity']['clean'].append(time_str)
-                elif 20 <= turb < 50:
-                    analysis['turbidity']['cloudy'].append(time_str)
-                elif turb >= 50:
-                    analysis['turbidity']['dirty'].append(time_str)
+            logging.info("Creating PDF document")
 
             # Create PDF
             buffer = BytesIO()
             doc = SimpleDocTemplate(
                 buffer,
-                pagesize=letter,
-                rightMargin=72,
-                leftMargin=72,
-                topMargin=72,
-                bottomMargin=72
+                pagesize=landscape(letter),
+                rightMargin=36,
+                leftMargin=36,
+                topMargin=36,
+                bottomMargin=36
             )
 
             # Define styles
@@ -472,84 +458,253 @@ class ReportService:
                 ("GRID", (0, 0), (-1, -1), 1, colors.black),
             ]))
             story.append(table)
-            story.append(Spacer(1, 20))
+            story.append(PageBreak())
 
             # Add summary statistics
-            story.append(Paragraph("Summary Statistics", heading2_style))
             if totals['count'] > 0:
+                story.append(Paragraph("Data Findings", heading2_style))
+                
+                avg_temp = totals['temperature']/totals['count']
+                avg_oxy = totals['oxygen']/totals['count']
+                avg_ph = totals['phlevel']/totals['count']
+                avg_turb = totals['turbidity']/totals['count']
+                avg_alive = totals['alive_catfish']/totals['count']
+                avg_dead = totals['dead_catfish']/totals['count']
+
                 summary_data = [
-                    ["Metric", "Average Value", "Total"],
-                    ["Temperature", f"{totals['temperature']/totals['count']:.2f}°C", f"{totals['temperature']:.2f}°C"],
-                    ["Oxygen", f"{totals['oxygen']/totals['count']:.2f} mg/L", f"{totals['oxygen']:.2f} mg/L"],
-                    ["pH Level", f"{totals['phlevel']/totals['count']:.2f}", f"{totals['phlevel']:.2f}"],
-                    ["Turbidity", f"{totals['turbidity']/totals['count']:.2f} NTU", f"{totals['turbidity']:.2f} NTU"],
-                    ["Catfish", "N/A", f"Alive: {int(totals['alive_catfish'])} Dead: {int(totals['dead_catfish'])}"]
+                    ["Parameter", "Average Value", "Status"],
+                    ["Temperature", f"{avg_temp:.2f}°C", self._get_temp_status(avg_temp)],
+                    ["Oxygen", f"{avg_oxy:.2f} mg/L", self._get_oxygen_status(avg_oxy)],
+                    ["pH Level", f"{avg_ph:.2f}", self._get_ph_status(avg_ph)],
+                    ["Turbidity", f"{avg_turb:.2f} NTU", self._get_turbidity_status(avg_turb)],
+                    ["Alive Catfish", f"{avg_alive:.2f}", "Average Count"],
+                    ["Dead Catfish", f"{avg_dead:.2f}", "Average Count"]
                 ]
+                
                 summary_table = Table(summary_data)
                 summary_table.setStyle(TableStyle([
                     ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                     ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ]))
                 story.append(summary_table)
                 story.append(Spacer(1, 20))
-
-            # Add detailed analysis
-            story.append(Paragraph("Detailed Analysis", heading2_style))
+                
+                story.append(Paragraph("Critical Incidents Analysis", heading2_style))
             story.append(Spacer(1, 12))
 
-            # Temperature Analysis
-            story.append(Paragraph("Temperature Incidents:", normal_style))
-            for category, times in analysis['temperature'].items():
-                if times and category != 'normal':  # Skip normal readings
+            # Track first occurrences of incidents
+            critical_incidents = {}
+
+            # Analyze all records
+            for record in recent_data:
+                time_str = record.timeData.strftime("%Y-%m-%d %H:%M:%S")
+                
+                # Temperature incidents
+                temp = float(record.temperature)
+                if temp <= 20:
+                    if 'cold_temp' not in critical_incidents:
+                        critical_incidents['cold_temp'] = {
+                            'time': time_str,
+                            'value': f"{temp:.2f}°C",
+                            'parameter': "Temperature",
+                            'status': "Cold Temperature",
+                            'causes': [
+                                "Cold Temperature in Environment",
+                                "Cold Water was used",
+                                "Cold Wind"
+                            ]
+                        }
+                elif 20 < temp < 26:
+                    if 'below_avg_temp' not in critical_incidents:
+                        critical_incidents['below_avg_temp'] = {
+                            'time': time_str,
+                            'value': f"{temp:.2f}°C",
+                            'parameter': "Temperature",
+                            'status': "Below Average Temperature",
+                            'causes': [
+                                "Sub Par Cold Temperature in Environment",
+                                "Cold Water was used"
+                            ]
+                        }
+                elif 32 <= temp < 35:
+                    if 'above_avg_temp' not in critical_incidents:
+                        critical_incidents['above_avg_temp'] = {
+                            'time': time_str,
+                            'value': f"{temp:.2f}°C",
+                            'parameter': "Temperature",
+                            'status': "Above Average Temperature",
+                            'causes': [
+                                "Hot Temperature in Environment",
+                                "Lukewarm Water was used",
+                                "Slightly Exposed to Sunlight"
+                            ]
+                        }
+                elif temp >= 35:
+                    if 'hot_temp' not in critical_incidents:
+                        critical_incidents['hot_temp'] = {
+                            'time': time_str,
+                            'value': f"{temp:.2f}°C",
+                            'parameter': "Temperature",
+                            'status': "Hot Temperature",
+                            'causes': [
+                                "Very Hot Temperature in Environment",
+                                "Boiling Water was used",
+                                "Full Exposure to Sunlight"
+                            ]
+                        }
+
+                # Oxygen incidents
+                oxy = float(record.oxygen)
+                if oxy <= 0.8:
+                    if 'very_low_oxygen' not in critical_incidents:
+                        critical_incidents['very_low_oxygen'] = {
+                            'time': time_str,
+                            'value': f"{oxy:.2f} mg/L",
+                            'parameter': "Oxygen",
+                            'status': "Very Low Oxygen",
+                            'causes': [
+                                "Overstocking of Catfish",
+                                "Stagnant Water",
+                                "No Ventilation",
+                                "Overfeeding"
+                            ]
+                        }
+                elif oxy < 1.5:
+                    if 'low_oxygen' not in critical_incidents:
+                        critical_incidents['low_oxygen'] = {
+                            'time': time_str,
+                            'value': f"{oxy:.2f} mg/L",
+                            'parameter': "Oxygen",
+                            'status': "Low Oxygen",
+                            'causes': [
+                                "High Volumes of Catfish",
+                                "Low Movement of Water",
+                                "Little Ventilation"
+                            ]
+                        }
+                elif oxy > 5:
+                    if 'high_oxygen' not in critical_incidents:
+                        critical_incidents['high_oxygen'] = {
+                            'time': time_str,
+                            'value': f"{oxy:.2f} mg/L",
+                            'parameter': "Oxygen",
+                            'status': "High Oxygen",
+                            'causes': [
+                                "Over-aeration of Water",
+                                "Chemicals",
+                                "Hyperoxygenation"
+                            ]
+                        }
+
+                # pH incidents
+                ph = float(record.phlevel)
+                if ph < 4:
+                    if 'very_acidic' not in critical_incidents:
+                        critical_incidents['very_acidic'] = {
+                            'time': time_str,
+                            'value': f"{ph:.2f}",
+                            'parameter': "pH Level",
+                            'status': "Very Acidic",
+                            'causes': [
+                                "Presence of Strong Acids",
+                                "Acid Rain",
+                                "Vinegar Contamination"
+                            ]
+                        }
+                elif 4 <= ph < 6:
+                    if 'acidic' not in critical_incidents:
+                        critical_incidents['acidic'] = {
+                            'time': time_str,
+                            'value': f"{ph:.2f}",
+                            'parameter': "pH Level",
+                            'status': "Acidic",
+                            'causes': [
+                                "Acidic Products",
+                                "Coffee Contamination"
+                            ]
+                        }
+                elif ph > 9:
+                    if 'very_alkaline' not in critical_incidents:
+                        critical_incidents['very_alkaline'] = {
+                            'time': time_str,
+                            'value': f"{ph:.2f}",
+                            'parameter': "pH Level",
+                            'status': "Very Alkaline",
+                            'causes': [
+                                "Dishwashing Liquid",
+                                "Ammonia Solution",
+                                "Bleach",
+                                "Soap Contamination"
+                            ]
+                        }
+
+                # Turbidity incidents
+                turb = float(record.turbidity)
+                if turb >= 50:
+                    if 'high_turbidity' not in critical_incidents:
+                        critical_incidents['high_turbidity'] = {
+                            'time': time_str,
+                            'value': f"{turb:.2f} NTU",
+                            'parameter': "Turbidity",
+                            'status': "Dirty",
+                            'causes': [
+                                "High Particle Content",
+                                "Poor Filtration",
+                                "Excess Waste"
+                            ]
+                        }
+                elif 20 <= turb < 50:
+                    if 'medium_turbidity' not in critical_incidents:
+                        critical_incidents['medium_turbidity'] = {
+                            'time': time_str,
+                            'value': f"{turb:.2f} NTU",
+                            'parameter': "Turbidity",
+                            'status': "Cloudy",
+                            'causes': [
+                                "Suspended Particles",
+                                "Organic Matter",
+                                "Moderate Waste Build-up"
+                            ]
+                        }
+
+            # Display critical incidents
+            if critical_incidents:
+                story.append(Paragraph("First Occurrences of Critical Incidents:", normal_style))
+                story.append(Spacer(1, 12))
+                
+                # Sort incidents by time
+                sorted_incidents = sorted(critical_incidents.values(), key=lambda x: x['time'])
+                
+                for incident in sorted_incidents:
                     story.append(Paragraph(
-                        f"- {category.replace('_', ' ').title()}: {len(times)} occurrences",
+                        f"<b>{incident['time']}</b> - {incident['parameter']}: {incident['value']} ({incident['status']})",
                         normal_style
                     ))
-                    for t in times:
-                        story.append(Paragraph(f"  • {t}", normal_style))
-            story.append(Spacer(1, 12))
+                    story.append(Paragraph("Possible causes:", normal_style))
+                    for cause in incident['causes']:
+                        story.append(Paragraph(f"• {cause}", normal_style))
+                    story.append(Spacer(1, 8))
+                
+                story.append(Spacer(1, 12))
+                story.append(Paragraph(
+                    "<b>Note:</b> These conditions may cause stress to the catfish and should be addressed promptly.",
+                    normal_style
+                ))
+            else:
+                story.append(Paragraph(
+                    "No critical incidents detected during this period. All parameters were within normal ranges.",
+                    normal_style
+                ))
 
-            # Oxygen Analysis
-            story.append(Paragraph("Oxygen Level Incidents:", normal_style))
-            for category, times in analysis['oxygen'].items():
-                if times and category != 'normal':  # Skip normal readings
-                    story.append(Paragraph(
-                        f"- {category.replace('_', ' ').title()}: {len(times)} occurrences",
-                        normal_style
-                    ))
-                    for t in times:
-                        story.append(Paragraph(f"  • {t}", normal_style))
-            story.append(Spacer(1, 12))
-
-            # pH Analysis
-            story.append(Paragraph("pH Level Incidents:", normal_style))
-            for category, times in analysis['ph'].items():
-                if times and category != 'normal':  # Skip normal readings
-                    story.append(Paragraph(
-                        f"- {category.replace('_', ' ').title()}: {len(times)} occurrences",
-                        normal_style
-                    ))
-                    for t in times:
-                        story.append(Paragraph(f"  • {t}", normal_style))
-            story.append(Spacer(1, 12))
-
-            # Turbidity Analysis
-            story.append(Paragraph("Turbidity Incidents:", normal_style))
-            for category, times in analysis['turbidity'].items():
-                if times and category != 'clean':  # Skip clean readings
-                    story.append(Paragraph(
-                        f"- {category.replace('_', ' ').title()}: {len(times)} occurrences",
-                        normal_style
-                    ))
-                    for t in times:
-                        story.append(Paragraph(f"  • {t}", normal_style))
-
-            # Build PDF
+            logging.info("Building PDF")
             doc.build(story)
             buffer.seek(0)
 
+            logging.info("Sending PDF file")
             return send_file(
                 buffer,
                 as_attachment=True,

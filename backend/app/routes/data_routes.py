@@ -1,7 +1,6 @@
 from flask import Blueprint, jsonify, request
-from flask_caching import Cache
+from app import cache, db  # Import db here
 from app.services.data_service import DataService
-from app import cache
 from app.utils.limiters import limiter
 from app.models import aquamans
 from datetime import datetime, timedelta
@@ -9,7 +8,8 @@ import logging
 bp = Blueprint('data', __name__)
 data_service = DataService()
 
-cache = Cache(config={'CACHE_TYPE': 'simple'})
+bp = Blueprint('data', __name__)
+data_service = DataService()
 
 @bp.route('/data', methods=['GET'])
 @limiter.exempt
@@ -28,6 +28,11 @@ def get_temperature_data():
 @limiter.exempt
 def get_filtered_temperature_data():
     filter_type = request.args.get('filter', 'date')
+    if filter_type not in ['date', 'week', 'month']:  # Add valid filter types
+        return jsonify({
+            'error': 'Invalid filter type'
+        }), 400
+    
     selected_date = request.args.get('selected_date')
     selected_week_start = request.args.get('week_start')
     return data_service.get_filtered_temperature_data(filter_type, selected_date, selected_week_start)
@@ -96,6 +101,19 @@ def get_weekly_data():
 @limiter.exempt
 def get_latest_image():
     return data_service.get_latest_image()
+
+@bp.route('/api/latest-detection', methods=['GET'])
+def get_latest_detection():
+    try:
+        # Query your database for the latest detection
+        latest_data = db.session.query(aquamans).order_by(aquamans.id.desc()).first()
+        
+        return jsonify({
+            'catfish': latest_data.catfish,
+            'dead_catfish': latest_data.dead_catfish
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # Error handler for this blueprint
 @bp.errorhandler(404)
