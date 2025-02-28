@@ -26,9 +26,10 @@ def get_temperature_data():
 
 @bp.route('/filtered-temperature-data', methods=['GET'])
 @limiter.exempt
+@cache.cached(timeout=300, query_string=True)  # Cache for 5 minutes
 def get_filtered_temperature_data():
     filter_type = request.args.get('filter', 'weekly')
-    if filter_type not in ['weekly', '3hours', 'date', 'week']:  # Updated valid filter types
+    if filter_type not in ['weekly', '3hours', 'date', 'week']:
         return jsonify({
             'error': 'Invalid filter type'
         }), 400
@@ -37,7 +38,6 @@ def get_filtered_temperature_data():
         query = db.session.query(aquamans)
 
         if filter_type == '3hours':
-            # Get last 24 hours of data
             time_threshold = datetime.utcnow() - timedelta(hours=24)
             query = query.filter(aquamans.timeData >= time_threshold)
         
@@ -62,12 +62,11 @@ def get_filtered_temperature_data():
                 )
         
         else:  # weekly (default)
-            # Get last 7 days of data
             time_threshold = datetime.utcnow() - timedelta(days=7)
             query = query.filter(aquamans.timeData >= time_threshold)
 
-        # Order by time and get results
-        results = query.order_by(aquamans.timeData.asc()).all()
+        # Add index hint and limit results
+        results = query.order_by(aquamans.timeData.asc()).limit(1000).all()
         
         data = [{
             'timeData': record.timeData.strftime('%Y-%m-%d %H:%M:%S'),
@@ -87,12 +86,59 @@ def get_oxygen_data():
 
 @bp.route('/filtered-oxygen-data', methods=['GET'])
 @limiter.exempt
+@cache.cached(timeout=300, query_string=True)  # Cache for 5 minutes
 def get_filtered_oxygen_data():
-    filter_type = request.args.get('filter', 'date')
-    selected_date = request.args.get('selected_date')
-    selected_week_start = request.args.get('week_start')
-    return data_service.get_filtered_oxygen_data(filter_type, selected_date, selected_week_start)
+    filter_type = request.args.get('filter', 'weekly')
+    if filter_type not in ['weekly', '3hours', 'date', 'week']:
+        return jsonify({
+            'error': 'Invalid filter type'
+        }), 400
+    
+    try:
+        query = db.session.query(aquamans)
 
+        if filter_type == '3hours':
+            time_threshold = datetime.utcnow() - timedelta(hours=24)
+            query = query.filter(aquamans.timeData >= time_threshold)
+        
+        elif filter_type == 'date':
+            selected_date = request.args.get('selected_date')
+            if selected_date:
+                date = datetime.strptime(selected_date, '%Y-%m-%d')
+                next_date = date + timedelta(days=1)
+                query = query.filter(
+                    aquamans.timeData >= date,
+                    aquamans.timeData < next_date
+                )
+        
+        elif filter_type == 'week':
+            week_start = request.args.get('week_start')
+            if week_start:
+                start_date = datetime.strptime(week_start, '%Y-%m-%d')
+                end_date = start_date + timedelta(days=7)
+                query = query.filter(
+                    aquamans.timeData >= start_date,
+                    aquamans.timeData < end_date
+                )
+        
+        else:  # weekly (default)
+            time_threshold = datetime.utcnow() - timedelta(days=7)
+            query = query.filter(aquamans.timeData >= time_threshold)
+
+        # Add index hint and limit results
+        results = query.order_by(aquamans.timeData.asc()).limit(1000).all()
+        
+        data = [{
+            'timeData': record.timeData.strftime('%Y-%m-%d %H:%M:%S'),
+            'oxygen': record.oxygen
+        } for record in results]
+
+        return jsonify(data)
+
+    except Exception as e:
+        logging.error(f"Error in filtered oxygen data: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    
 @bp.route('/phlevel-data', methods=['GET'])
 @limiter.exempt
 def get_phlevel_data():

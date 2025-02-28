@@ -1,10 +1,11 @@
+# app/__init__.py
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
 from flask_caching import Cache
 from app.utils.limiters import limiter
-from app.routes import video_routes
 
+# Initialize extensions
 db = SQLAlchemy()
 cache = Cache()
 
@@ -31,14 +32,19 @@ def create_app():
             "allow_headers": ["Content-Type", "Authorization"]
         }
     })
+    
+    # Initialize extensions with app
     db.init_app(app)
     cache.init_app(app)
     limiter.init_app(app)
 
-    from app.routes import sensor_routes, data_routes, report_routes
-    app.register_blueprint(sensor_routes.bp)
-    app.register_blueprint(data_routes.bp)
-    app.register_blueprint(report_routes.bp)
-    app.register_blueprint(video_routes.video_bp, url_prefix='/video')
+    with app.app_context():
+        # Import routes here to avoid circular imports
+        from app.routes import sensor_routes, data_routes, report_routes, video_routes
+        
+        app.register_blueprint(sensor_routes.bp)
+        app.register_blueprint(data_routes.bp)
+        app.register_blueprint(report_routes.bp)
+        app.register_blueprint(video_routes.video_bp, url_prefix='/video')
 
     return app

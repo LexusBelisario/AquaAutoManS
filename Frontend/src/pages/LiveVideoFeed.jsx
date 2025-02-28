@@ -1,13 +1,13 @@
 // LiveVideoFeed.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useRef } from "react";
+import axios from "axios";
 
 const LiveVideoFeed = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [detectionData, setDetectionData] = useState({
     catfish: 0,
-    deadCatfish: 0
+    deadCatfish: 0,
   });
   const imageRef = useRef(null);
 
@@ -20,7 +20,7 @@ const LiveVideoFeed = () => {
   // Function to handle image error
   const handleImageError = () => {
     setIsLoading(false);
-    setError('Failed to load video feed');
+    setError("Failed to load video feed");
     // Attempt to reload the image after a short delay
     setTimeout(() => {
       if (imageRef.current) {
@@ -33,13 +33,17 @@ const LiveVideoFeed = () => {
   useEffect(() => {
     const fetchDetectionData = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/latest-detection');
-        setDetectionData({
-          catfish: response.data.catfish || 0,
-          deadCatfish: response.data.dead_catfish || 0
-        });
+        const response = await axios.get(
+          "http://localhost:5000/video/detection_status"
+        );
+        if (response.data.status === "success") {
+          setDetectionData({
+            catfish: response.data.catfish_count,
+            deadCatfish: response.data.dead_catfish_count,
+          });
+        }
       } catch (error) {
-        console.error('Error fetching detection data:', error);
+        console.error("Error fetching detection data:", error);
       }
     };
 
@@ -53,7 +57,7 @@ const LiveVideoFeed = () => {
         <h2 className="text-2xl font-bold text-gray-800 mb-4">
           Live Detection Feed
         </h2>
-        
+
         {/* Video Display Container */}
         <div className="relative aspect-video bg-black rounded-lg overflow-hidden mb-4">
           {/* Loading Spinner */}
@@ -62,13 +66,13 @@ const LiveVideoFeed = () => {
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
           )}
-          
+
           {/* Error Message */}
           {error && (
             <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
               <div className="text-white text-center p-4">
                 <p className="text-red-500 mb-2">{error}</p>
-                <button 
+                <button
                   onClick={() => {
                     setIsLoading(true);
                     setError(null);
@@ -93,7 +97,7 @@ const LiveVideoFeed = () => {
             onLoad={handleImageLoad}
             onError={handleImageError}
           />
-          
+
           {/* Detection Overlay */}
           <div className="absolute top-4 left-4 bg-black bg-opacity-50 rounded-lg p-3">
             <p className="text-white font-semibold">
@@ -112,13 +116,21 @@ const LiveVideoFeed = () => {
               Camera Status
             </h3>
             <div className="flex items-center mt-2">
-              <div className={`w-3 h-3 rounded-full ${isLoading ? 'bg-yellow-500' : error ? 'bg-red-500' : 'bg-green-500'} mr-2`}></div>
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  isLoading
+                    ? "bg-yellow-500"
+                    : error
+                    ? "bg-red-500"
+                    : "bg-green-500"
+                } mr-2`}
+              ></div>
               <span className="text-gray-600">
-                {isLoading ? 'Connecting...' : error ? 'Error' : 'Connected'}
+                {isLoading ? "Connecting..." : error ? "Error" : "Connected"}
               </span>
             </div>
           </div>
-          
+
           <div className="bg-gray-50 p-4 rounded-lg">
             <h3 className="text-lg font-semibold text-gray-700">
               Detection Status

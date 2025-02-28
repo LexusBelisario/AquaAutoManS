@@ -3,3 +3,84 @@
 2025-02-28 22:55:35,189 - app.routes.video_routes - ERROR - Failed to read initial frame
 2025-02-28 22:57:41,048 - app.routes.video_routes - ERROR - Failed to capture test frame
 2025-02-28 22:57:41,062 - app.routes.video_routes - ERROR - Camera initialization failed
+2025-02-28 23:27:00,810 - app.routes.video_routes - ERROR - Database update error: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:27:00,812 - app.routes.video_routes - ERROR - Frame generation error: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:31:27,290 - app.routes.video_routes - ERROR - Error in generate_frames: name 'timedelta' is not defined
+2025-02-28 23:35:28,370 - app.routes.video_routes - ERROR - Database update error: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:35:28,371 - app.routes.video_routes - ERROR - Error in generate_frames: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:36:08,445 - app.routes.video_routes - ERROR - Database update error: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:36:08,446 - app.routes.video_routes - ERROR - Error in generate_frames: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:40:15,063 - app.routes.video_routes - ERROR - Database update error: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:40:15,064 - app.routes.video_routes - ERROR - Error in generate_frames: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:44:11,493 - app.routes.video_routes - ERROR - Database update error: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:44:11,500 - app.routes.video_routes - ERROR - Error in generate_frames: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:46:11,526 - app.routes.video_routes - ERROR - Database update error: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:46:11,528 - app.routes.video_routes - ERROR - Error in generate_frames: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:48:28,155 - app.routes.video_routes - ERROR - Database update error: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:48:28,156 - app.routes.video_routes - ERROR - Error in generate_frames: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:50:54,697 - app.routes.video_routes - ERROR - Database error: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.
+2025-02-28 23:50:54,753 - app.routes.video_routes - ERROR - Error in generate_frames: Working outside of application context.
+
+This typically means that you attempted to use functionality that needed
+the current application. To solve this, set up an application context
+with app.app_context(). See the documentation for more information.

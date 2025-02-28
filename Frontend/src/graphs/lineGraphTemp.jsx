@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -24,83 +24,62 @@ ChartJS.register(
 export const LineGraphTemp = () => {
   const [temperatureData, setTemperatureData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("weekly"); // default filter is 'weekly'
-  const [selectedDate, setSelectedDate] = useState(""); // state to store selected date
-  const [weekStart, setWeekStart] = useState(""); // state to store selected week start date
+  const [filter, setFilter] = useState("weekly");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [weekStart, setWeekStart] = useState("");
+  const [cache, setCache] = useState({}); // Add cache state
+
+  // Memoize the fetch function
+  const fetchTemperatureData = useCallback(async () => {
+    try {
+      // Create cache key based on current filter parameters
+      const cacheKey = `${filter}-${selectedDate}-${weekStart}`;
+
+      // Check if data exists in cache
+      if (cache[cacheKey]) {
+        setTemperatureData(cache[cacheKey]);
+        setLoading(false);
+        return;
+      }
+
+      let url = `http://127.0.0.1:5000/filtered-temperature-data?filter=${filter}`;
+
+      if (filter === "date" && selectedDate) {
+        url += `&selected_date=${selectedDate}`;
+      } else if (filter === "week" && weekStart) {
+        url += `&week_start=${weekStart}`;
+      }
+
+      setLoading(true);
+      const response = await fetch(url);
+      const data = await response.json();
+
+      const processedData = processTemperatureData(data);
+
+      // Store in cache
+      setCache((prevCache) => ({
+        ...prevCache,
+        [cacheKey]: processedData,
+      }));
+
+      setTemperatureData(processedData);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching temperature data:", error);
+      setLoading(false);
+    }
+  }, [filter, selectedDate, weekStart, cache]);
 
   useEffect(() => {
-    const fetchTemperatureData = async () => {
-      try {
-        let url = `http://127.0.0.1:5000/filtered-temperature-data?filter=${filter}`;
-
-        // Append the selected date or week start to the request if available
-        if (filter === "date" && selectedDate) {
-          url += `&selected_date=${selectedDate}`;
-        } else if (filter === "week" && weekStart) {
-          url += `&week_start=${weekStart}`;
-        }
-
-        const response = await fetch(url);
-        const data = await response.json();
-
-        console.log("Fetched data:", data);
-
-        const processedData = processTemperatureData(data);
-        setTemperatureData(processedData);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching temperature data:", error);
-        setLoading(false);
-      }
-    };
     fetchTemperatureData();
-  }, [filter, selectedDate, weekStart]); // refetch data when filter, selectedDate, or weekStart changes
+  }, [fetchTemperatureData]);
 
-  const processTemperatureData = (data) => {
-    const labels =
-      filter === "3hours"
-        ? []
-        : [
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-            "Sunday",
-          ];
-    const temperatures =
-      filter === "3hours" ? [] : [50, 40, 30, 20, 10, 0].map(() => []);
-
-    const dailyTemperatures = Array(7)
-      .fill(0)
-      .map(() => []);
-
-    data.forEach((entry) => {
-      const date = new Date(entry.timeData);
-      const temp = entry.temperature;
-
-      if (filter === "3hours") {
-        const timeLabel = `${date.getHours()}:00 ${date.toLocaleDateString()}`;
-        labels.push(timeLabel);
-        temperatures.push(temp);
-      } else {
-        const dayIndex = date.getDay();
-        if (dayIndex >= 1) {
-          dailyTemperatures[dayIndex - 1].push(temp);
-        }
-      }
-    });
-
-    const avgTemperatures = dailyTemperatures.map((tempArray) => {
-      if (tempArray.length === 0) return 0;
-      return tempArray.reduce((sum, temp) => sum + temp, 0) / tempArray.length;
-    });
-
-    return {
-      labels:
+  // Memoize the processing function
+  const processTemperatureData = useMemo(
+    () => (data) => {
+      const labels =
         filter === "3hours"
-          ? labels
+          ? []
           : [
               "Monday",
               "Tuesday",
@@ -109,41 +88,94 @@ export const LineGraphTemp = () => {
               "Friday",
               "Saturday",
               "Sunday",
-            ],
-      datasets: [
-        {
-          label:
+            ];
+      const temperatures = filter === "3hours" ? [] : [];
+
+      const dailyTemperatures = Array(7)
+        .fill(0)
+        .map(() => []);
+
+      data.forEach((entry) => {
+        const date = new Date(entry.timeData);
+        const temp = entry.temperature;
+
+        if (filter === "3hours") {
+          const timeLabel = `${date.getHours()}:00 ${date.toLocaleDateString()}`;
+          labels.push(timeLabel);
+          temperatures.push(temp);
+        } else {
+          const dayIndex = date.getDay();
+          if (dayIndex >= 1) {
+            dailyTemperatures[dayIndex - 1].push(temp);
+          }
+        }
+      });
+
+      const avgTemperatures = dailyTemperatures.map((tempArray) => {
+        if (tempArray.length === 0) return 0;
+        return (
+          tempArray.reduce((sum, temp) => sum + temp, 0) / tempArray.length
+        );
+      });
+
+      return {
+        labels:
+          filter === "3hours"
+            ? labels
+            : [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday",
+              ],
+        datasets: [
+          {
+            label:
+              filter === "3hours"
+                ? "Temperature Every 3 Hours"
+                : "Average Temperature",
+            data: filter === "3hours" ? temperatures : avgTemperatures,
+            fill: false,
+            borderColor: "#FF5F1F",
+            tension: 0.1,
+          },
+        ],
+      };
+    },
+    [filter]
+  );
+
+  // Memoize options
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "top",
+        },
+        title: {
+          display: true,
+          text:
             filter === "3hours"
               ? "Temperature Every 3 Hours"
-              : "Average Temperature",
-          data: filter === "3hours" ? temperatures : avgTemperatures,
-          fill: false,
-          borderColor: "#FF5F1F",
-          tension: 0.1,
+              : "Weekly Temperature",
         },
-      ],
-    };
-  };
-
-  const options = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: "top",
       },
-      title: {
-        display: true,
-        text:
-          filter === "3hours"
-            ? "Temperature Every 3 Hours"
-            : "Weekly Temperature",
-      },
-    },
-  };
+    }),
+    [filter]
+  );
 
-  return loading ? (
-    <div>Loading...</div>
-  ) : (
+  // Loading spinner component
+  const LoadingSpinner = () => (
+    <div className="flex justify-center items-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+    </div>
+  );
+
+  return (
     <div className="w-full max-w-screen-lg mx-auto">
       <div className="mb-4">
         <label>Filter: </label>
@@ -155,7 +187,6 @@ export const LineGraphTemp = () => {
         </select>
       </div>
 
-      {/* Show input fields based on selected filter */}
       {filter === "date" && (
         <div className="mb-4">
           <label>Select Date: </label>
@@ -178,10 +209,12 @@ export const LineGraphTemp = () => {
         </div>
       )}
 
-      {temperatureData.labels.length > 0 ? (
+      {loading ? (
+        <LoadingSpinner />
+      ) : temperatureData?.labels?.length > 0 ? (
         <Line options={options} data={temperatureData} />
       ) : (
-        <div>No data available to display</div>
+        <div className="text-center py-4">No data available to display</div>
       )}
     </div>
   );
