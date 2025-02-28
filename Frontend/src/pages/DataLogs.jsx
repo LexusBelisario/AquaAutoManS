@@ -110,7 +110,7 @@ export default function DataLogs({ setAuth }) {
               (row.phlevel >= 4 && row.phlevel < 6) ||
               row.phlevel < 4 ||
               (row.phlevel > 7 && row.phlevel <= 9) ||
-              row.phlevel < 9
+              row.phlevel > 9
                 ? "red"
                 : "black",
             padding: "8px",
@@ -149,83 +149,64 @@ export default function DataLogs({ setAuth }) {
       name: "Time",
       selector: (row) => row["timeData"],
       sortable: true,
+      cell: (row) => {
+        const dateTime = row.timeData
+          ? row.timeData.replace("T", " ").slice(0, 19)
+          : "";
+        return <div>{dateTime}</div>;
+      },
     },
   ];
 
   const fetchData = useCallback(async () => {
-    setPageData((prev) => ({ ...prev, loading: true }));
     try {
-      const config = {
+      setPageData((prev) => ({ ...prev, loading: true }));
+
+      const response = await axios.get("http://localhost:5000/data", {
         params: {
-          date: filterDate || null, // Send null if no date selected
+          date: filterDate,
           page: currentPage,
           per_page: rowsPerPage,
         },
-      };
+      });
 
-      const response = await axios.get("http://localhost:5000/data", config);
-
-      if (response.data && response.data.data) {
-        setPageData({
-          data: response.data.data,
-          total: response.data.total,
-          loading: false,
-          error: null,
-        });
-      } else {
-        throw new Error("Invalid data format received from server");
-      }
+      setPageData({
+        data: response.data.data,
+        total: response.data.total,
+        loading: false,
+        error: null,
+      });
     } catch (error) {
       console.error("Error fetching data:", error);
-      let errorMessage = "An unexpected error occurred";
-
-      if (error.response) {
-        if (error.response.status === 404) {
-          errorMessage = "No data found for the selected date";
-        } else if (error.response.status === 400) {
-          errorMessage = "Invalid date format";
-        } else if (error.response.status === 500) {
-          errorMessage = "Server error. Please try again later.";
-        }
-      } else if (error.request) {
-        errorMessage = "Unable to connect to the server";
-      }
-
       setPageData((prev) => ({
         ...prev,
         loading: false,
-        error: errorMessage,
-        data: [],
-        total: 0,
+        error: "Error loading data",
       }));
     }
   }, [filterDate, currentPage, rowsPerPage]);
 
   useEffect(() => {
     fetchData();
-    // Reduced polling frequency to 30 seconds
-    const intervalId = setInterval(fetchData, 30000);
+    // Set up polling interval
+    const intervalId = setInterval(fetchData, 5000); // Poll every 5 seconds
+
+    // Cleanup interval on component unmount
     return () => clearInterval(intervalId);
   }, [fetchData]);
-
-  const handleDateChange = (e) => {
-    const selectedDate = e.target.value;
-    setFilterDate(selectedDate);
-    setCurrentPage(1); // Reset to first page when date changes
-  };
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
   };
 
-  const handleRowsPerPageChange = (newRowsPerPage) => {
-    setRowsPerPage(newRowsPerPage);
-    setCurrentPage(1); // Reset to first page when rows per page changes
+  const handleRowsPerPageChange = (newPerPage) => {
+    setRowsPerPage(newPerPage);
+    setCurrentPage(1);
   };
 
   const generateReport = async (filterOption) => {
     try {
-      setIsLoading(true); // Show loading state
+      setIsLoading(true);
       let url = "http://localhost:5000/check_data/print";
 
       if (filterOption === "by_date" && !filterDate) {
@@ -246,13 +227,13 @@ export default function DataLogs({ setAuth }) {
         timeout: 300000, // 5 minute timeout
       });
 
-      const blob = new Blob([response.data], { type: "text/csv" });
+      const blob = new Blob([response.data], { type: "application/pdf" });
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = downloadUrl;
       link.download = `aquamans_report_${new Date()
         .toISOString()
-        .slice(0, 10)}.csv`;
+        .slice(0, 10)}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -261,7 +242,7 @@ export default function DataLogs({ setAuth }) {
       console.error("Error generating report:", error);
       alert("Error generating report. Please try again.");
     } finally {
-      setIsLoading(false); // Hide loading state
+      setIsLoading(false);
     }
   };
 
@@ -282,7 +263,10 @@ export default function DataLogs({ setAuth }) {
               type="date"
               id="dateFilter"
               value={filterDate}
-              onChange={handleDateChange}
+              onChange={(e) => {
+                setFilterDate(e.target.value);
+                setCurrentPage(1);
+              }}
               className="border border-gray-300 rounded p-2"
             />
           </div>
@@ -290,31 +274,33 @@ export default function DataLogs({ setAuth }) {
           <div className="mb-4">
             <button
               onClick={() => generateReport("3_hours")}
-              className="bg-blue-500 text-white px-4 py-2 rounded mr-2"
+              className="bg-blue-500 text-white px-4 py-2 rounded mr-2 hover:bg-blue-600 transition-colors"
               disabled={isLoading}
             >
               {isLoading ? "Generating..." : "Generate 3 Hours Report"}
             </button>
             <button
               onClick={() => generateReport("1_hour")}
-              className="bg-blue-500 text-white px-4 py-2 rounded mr-2"
+              className="bg-blue-500 text-white px-4 py-2 rounded mr-2 hover:bg-blue-600 transition-colors"
               disabled={isLoading}
             >
               {isLoading ? "Generating..." : "Generate 1 Hour Report"}
             </button>
             <button
               onClick={() => generateReport("by_date")}
-              className="bg-blue-500 text-white px-4 py-2 rounded"
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
               disabled={isLoading}
             >
               {isLoading ? "Generating..." : "Generate Report By Date"}
             </button>
           </div>
 
-          {isLoading && (
-            <div className="text-center py-4">
-              Generating report, please wait...
-            </div>
+          {pageData.loading && (
+            <div className="text-center py-4">Loading...</div>
+          )}
+
+          {pageData.error && (
+            <div className="text-red-500 py-4">{pageData.error}</div>
           )}
 
           <div id="printable-table">
@@ -329,8 +315,9 @@ export default function DataLogs({ setAuth }) {
               onChangePage={handlePageChange}
               onChangeRowsPerPage={handleRowsPerPageChange}
               progressPending={pageData.loading}
+              progressComponent={<div>Loading...</div>}
               persistTableHead
-              paginationRowsPerPageOptions={[10, 20, 30, 50]}
+              paginationRowsPerPageOptions={[10, 25, 50, 100]}
             />
           </div>
         </div>
