@@ -11,7 +11,6 @@ from app import db
 from app.models import aquamans
 from PIL import Image
 from io import BytesIO
-import numpy as np
 
 video_bp = Blueprint('video', __name__)
 CORS(video_bp)
@@ -29,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 # Load YOLO model
 try:
-    model = YOLO("C:/Users/user/AquaAutoManS/machine_learning/weights/best1.pt")
+    model = YOLO("C:/Users/ADMIN/AquaAutoManS/machine_learning/weights/best1.pt")
     class_names = ["catfish", "dead_catfish"]
     logger.info("YOLO model loaded successfully")
 except Exception as e:
@@ -48,10 +47,18 @@ def init_camera():
             logger.error("Failed to open camera")
             return None
 
+        # Set camera properties
         camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         camera.set(cv2.CAP_PROP_FPS, 30)
         
+        # Test camera
+        ret, _ = camera.read()
+        if not ret:
+            logger.error("Failed to read test frame")
+            return None
+            
+        logger.info("Camera initialized successfully")
         return camera
     except Exception as e:
         logger.error(f"Camera initialization error: {str(e)}")
@@ -63,6 +70,7 @@ def process_frame(frame):
         if model is None:
             return frame, 0, 0
 
+        # Run detection
         results = model.predict(frame, conf=0.25, iou=0.5)
         catfish_count = 0
         dead_catfish_count = 0
@@ -73,12 +81,14 @@ def process_frame(frame):
                 conf = float(box.conf[0])
                 cls = int(box.cls[0])
                 
+                # Filter out small detections
                 if (x2 - x1) < 20 or (y2 - y1) < 20:
                     continue
                 
                 label = f"{class_names[cls]} {conf:.2f}"
                 color = (0, 255, 0) if cls == 0 else (0, 0, 255)
                 
+                # Draw detection box and label
                 cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
                 cv2.putText(frame, label, (x1, y1 - 10), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
@@ -97,17 +107,19 @@ def process_frame(frame):
 def update_database(frame, catfish_count, dead_catfish_count):
     """Update database with detection results"""
     try:
-        current_time = datetime.now()
-        
         # Get latest sensor data
         latest_data = db.session.query(aquamans).order_by(aquamans.id.desc()).first()
         
         if latest_data:
-            # Convert frame to JPEG for storage
-            pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            img_byte_arr = BytesIO()
-            pil_image.save(img_byte_arr, format='JPEG')
-            img_bytes = img_byte_arr.getvalue()
+            current_time = datetime.now()
+            
+            # Convert frame to JPEG if dead catfish detected
+            img_bytes = None
+            if dead_catfish_count > 0:
+                pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                img_byte_arr = BytesIO()
+                pil_image.save(img_byte_arr, format='JPEG')
+                img_bytes = img_byte_arr.getvalue()
 
             # Create new record
             new_record = aquamans(
@@ -122,7 +134,7 @@ def update_database(frame, catfish_count, dead_catfish_count):
                 catfish=catfish_count,
                 dead_catfish=dead_catfish_count,
                 timeData=current_time,
-                dead_catfish_image=img_bytes if dead_catfish_count > 0 else None
+                dead_catfish_image=img_bytes
             )
 
             db.session.add(new_record)
@@ -145,18 +157,28 @@ def generate_frames():
 
     try:
         while True:
-            # Check for system rest period
+            # Check for hourly rest period
             elapsed_time = datetime.now() - start_time
             if elapsed_time >= timedelta(hours=1):
                 logger.info("Resting for 5 minutes to prevent overheating...")
-                time.sleep(300)
+                camera.release()
+                time.sleep(300)  # Rest for 5 minutes
+                
+                # Reinitialize camera after rest
+                camera = init_camera()
+                if camera is None:
+                    return
+                    
                 start_time = datetime.now()
+                logger.info("Resuming after rest period")
+                continue
 
             # Capture frame
             ret, frame = camera.read()
             if not ret:
                 logger.error("Failed to capture frame")
-                break
+                time.sleep(1)
+                continue
 
             # Process frame with detection
             frame, catfish_count, dead_catfish_count = process_frame(frame)
@@ -164,7 +186,7 @@ def generate_frames():
             # Add timestamp and counts to frame
             cv2.putText(frame, f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            cv2.putText(frame, f"Catfish: {catfish_count}", 
+            cv2.putText(frame, f"Live Catfish: {catfish_count}", 
                        (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             cv2.putText(frame, f"Dead Catfish: {dead_catfish_count}", 
                        (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
@@ -176,7 +198,7 @@ def generate_frames():
                 last_db_update = current_time
 
             # Encode and yield frame
-            ret, buffer = cv2.imencode('.jpg', frame)
+            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
             if not ret:
                 continue
 
@@ -187,7 +209,8 @@ def generate_frames():
     except Exception as e:
         logger.error(f"Error in generate_frames: {str(e)}")
     finally:
-        camera.release()
+        if camera is not None:
+            camera.release()
 
 @video_bp.route('/video_feed')
 @limiter.exempt
@@ -222,5 +245,3 @@ def detection_status():
     except Exception as e:
         logger.error(f"Error getting detection status: {str(e)}")
         return jsonify({'error': str(e)}), 500
-    
-    # pastillas

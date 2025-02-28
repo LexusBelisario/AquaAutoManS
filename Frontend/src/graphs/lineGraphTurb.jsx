@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -27,39 +27,78 @@ export const LineGraphTurb = () => {
   const [filter, setFilter] = useState("weekly");
   const [selectedDate, setSelectedDate] = useState("");
   const [weekStart, setWeekStart] = useState("");
+  const [cache, setCache] = useState({});
 
-  useEffect(() => {
-    const fetchTurbidityData = async () => {
-      try {
-        let url = `http://127.0.0.1:5000/filtered-turbidity-data?filter=${filter}`;
+  const processTurbidityData = useMemo(
+    () => (data) => {
+      console.log("Processing turbidity data:", data); // Debug log
 
-        if (filter === "date" && selectedDate) {
-          url += `&selected_date=${selectedDate}`;
-        } else if (filter === "week" && weekStart) {
-          url += `&week_start=${weekStart}`;
-        }
-
-        const response = await fetch(url);
-        const data = await response.json();
-
-        console.log("Fetched turbidity data:", data);
-
-        const processedData = processTurbidityData(data);
-        setTurbidityData(processedData);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching turbidity data:", error);
-        setLoading(false);
+      if (!Array.isArray(data) || data.length === 0) {
+        console.log("No turbidity data to process");
+        return {
+          labels: [],
+          datasets: [],
+        };
       }
-    };
-    fetchTurbidityData();
-  }, [filter, selectedDate, weekStart]);
 
-  const processTurbidityData = (data) => {
-    const labels =
-      filter === "3hours"
-        ? []
-        : [
+      if (filter === "3hours") {
+        const labels = [];
+        const turbidityLevels = [];
+
+        data.forEach((entry) => {
+          const date = new Date(entry.timeData);
+          const timeLabel = `${date.getHours()}:00 ${date.toLocaleDateString()}`;
+          labels.push(timeLabel);
+          turbidityLevels.push(entry.turbidity);
+        });
+
+        return {
+          labels,
+          datasets: [
+            {
+              label: "Turbidity Every 3 Hours",
+              data: turbidityLevels,
+              fill: false,
+              borderColor: "#FFEB3B",
+              tension: 0.1,
+            },
+          ],
+        };
+      } else {
+        // For weekly view
+        const dailyData = {
+          0: [], // Monday
+          1: [], // Tuesday
+          2: [], // Wednesday
+          3: [], // Thursday
+          4: [], // Friday
+          5: [], // Saturday
+          6: [], // Sunday
+        };
+
+        // Group data by day
+        data.forEach((entry) => {
+          const date = new Date(entry.timeData);
+          // Convert Sunday (0) to 6, and other days to 0-5
+          const dayIndex = (date.getDay() + 6) % 7;
+          if (entry.turbidity != null) {
+            dailyData[dayIndex].push(entry.turbidity);
+          }
+        });
+
+        console.log("Grouped daily turbidity data:", dailyData); // Debug log
+
+        // Calculate averages
+        const avgTurbidityLevels = Object.values(dailyData).map((levels) => {
+          if (levels.length === 0) return 0;
+          const sum = levels.reduce((acc, level) => acc + level, 0);
+          return parseFloat((sum / levels.length).toFixed(2));
+        });
+
+        console.log("Calculated turbidity averages:", avgTurbidityLevels); // Debug log
+
+        return {
+          labels: [
             "Monday",
             "Tuesday",
             "Wednesday",
@@ -67,87 +106,117 @@ export const LineGraphTurb = () => {
             "Friday",
             "Saturday",
             "Sunday",
-          ];
-    const turbidityLevels =
-      filter === "3hours" ? [] : [100, 80, 60, 40, 20, 0].map(() => []);
-
-    const dailyTurbidityLevels = Array(7)
-      .fill(0)
-      .map(() => []);
-
-    data.forEach((entry) => {
-      const date = new Date(entry.timeData);
-      const turbidity = entry.turbidity;
-
-      if (filter === "3hours") {
-        const timeLabel = `${date.getHours()}:00 ${date.toLocaleDateString()}`;
-        labels.push(timeLabel);
-        turbidityLevels.push(turbidity);
-      } else {
-        const dayIndex = date.getDay();
-        if (dayIndex >= 1) {
-          dailyTurbidityLevels[dayIndex - 1].push(turbidity);
-        }
+          ],
+          datasets: [
+            {
+              label: "Average Turbidity",
+              data: avgTurbidityLevels,
+              fill: false,
+              borderColor: "#FFEB3B",
+              tension: 0.1,
+            },
+          ],
+        };
       }
-    });
+    },
+    [filter]
+  );
 
-    const avgTurbidityLevels = dailyTurbidityLevels.map((turbidityArray) => {
-      if (turbidityArray.length === 0) return 0;
-      return (
-        turbidityArray.reduce((sum, turb) => sum + turb, 0) /
-        turbidityArray.length
-      );
-    });
+  const fetchTurbidityData = useCallback(async () => {
+    try {
+      const cacheKey = `${filter}-${selectedDate}-${weekStart}`;
 
-    return {
-      labels:
-        filter === "3hours"
-          ? labels
-          : [
-              "Monday",
-              "Tuesday",
-              "Wednesday",
-              "Thursday",
-              "Friday",
-              "Saturday",
-              "Sunday",
-            ],
-      datasets: [
-        {
-          label:
+      if (cache[cacheKey]) {
+        console.log("Using cached turbidity data for:", cacheKey);
+        setTurbidityData(cache[cacheKey]);
+        setLoading(false);
+        return;
+      }
+
+      let url = `http://127.0.0.1:5000/filtered-turbidity-data?filter=${filter}`;
+
+      if (filter === "date" && selectedDate) {
+        url += `&selected_date=${selectedDate}`;
+      } else if (filter === "week" && weekStart) {
+        url += `&week_start=${weekStart}`;
+      }
+
+      console.log("Fetching turbidity data from:", url); // Debug log
+
+      setLoading(true);
+      const response = await fetch(url);
+      const data = await response.json();
+
+      console.log("Raw turbidity data from API:", data); // Debug log
+
+      if (!Array.isArray(data)) {
+        console.error("Invalid turbidity data format received:", data);
+        setLoading(false);
+        return;
+      }
+
+      const processedData = processTurbidityData(data);
+      console.log("Processed turbidity data:", processedData); // Debug log
+
+      setCache((prevCache) => ({
+        ...prevCache,
+        [cacheKey]: processedData,
+      }));
+
+      setTurbidityData(processedData);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching turbidity data:", error);
+      setLoading(false);
+    }
+  }, [filter, selectedDate, weekStart, cache, processTurbidityData]);
+
+  useEffect(() => {
+    fetchTurbidityData();
+  }, [fetchTurbidityData]);
+
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "top",
+        },
+        title: {
+          display: true,
+          text:
             filter === "3hours"
               ? "Turbidity Every 3 Hours"
-              : "Average Turbidity",
-          data: filter === "3hours" ? turbidityLevels : avgTurbidityLevels,
-          fill: false,
-          borderColor: "#FFEB3B",
-          tension: 0.1,
+              : "Weekly Turbidity",
         },
-      ],
-    };
-  };
-
-  const options = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: "top",
       },
-      title: {
-        display: true,
-        text:
-          filter === "3hours" ? "Turbidity Every 3 Hours" : "Weekly Turbidity",
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: (value) => `${value} NTU`,
+          },
+        },
       },
-    },
-  };
+    }),
+    [filter]
+  );
 
-  return loading ? (
-    <div>Loading...</div>
-  ) : (
-    <div className="w-full max-w-screen-lg mx-auto">
+  const LoadingSpinner = () => (
+    <div className="flex justify-center items-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+    </div>
+  );
+
+  return (
+    <div className="w-full max-w-screen-lg mx-auto p-4">
       <div className="mb-4">
-        <label>Filter: </label>
-        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+        <label className="mr-2">Filter: </label>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="p-2 border rounded"
+        >
           <option value="weekly">Weekly</option>
           <option value="3hours">Every 3 Hours</option>
           <option value="date">By Date</option>
@@ -157,30 +226,38 @@ export const LineGraphTurb = () => {
 
       {filter === "date" && (
         <div className="mb-4">
-          <label>Select Date: </label>
+          <label className="mr-2">Select Date: </label>
           <input
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
+            className="p-2 border rounded"
           />
         </div>
       )}
 
       {filter === "week" && (
         <div className="mb-4">
-          <label>Select Week Start (Sunday): </label>
+          <label className="mr-2">Select Week Start (Sunday): </label>
           <input
             type="date"
             value={weekStart}
             onChange={(e) => setWeekStart(e.target.value)}
+            className="p-2 border rounded"
           />
         </div>
       )}
 
-      {turbidityData.labels.length > 0 ? (
-        <Line options={options} data={turbidityData} />
+      {loading ? (
+        <LoadingSpinner />
+      ) : turbidityData?.labels?.length > 0 ? (
+        <div className="bg-white p-4 rounded-lg shadow">
+          <Line options={options} data={turbidityData} />
+        </div>
       ) : (
-        <div>No data available to display</div>
+        <div className="text-center py-4 text-gray-600">
+          No data available to display
+        </div>
       )}
     </div>
   );

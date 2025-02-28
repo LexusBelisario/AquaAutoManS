@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -24,43 +24,81 @@ ChartJS.register(
 export const LineGraphPH = () => {
   const [phLevelData, setPhLevelData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("weekly"); // default filter is 'weekly'
-  const [selectedDate, setSelectedDate] = useState(""); // state to store selected date
-  const [weekStart, setWeekStart] = useState(""); // state to store selected week start date
+  const [filter, setFilter] = useState("weekly");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [weekStart, setWeekStart] = useState("");
+  const [cache, setCache] = useState({});
 
-  useEffect(() => {
-    const fetchPhLevelData = async () => {
-      try {
-        let url = `http://127.0.0.1:5000/filtered-phlevel-data?filter=${filter}`;
+  const processPhLevelData = useMemo(
+    () => (data) => {
+      console.log("Processing pH level data:", data); // Debug log
 
-        // Append the selected date or week start to the request if available
-        if (filter === "date" && selectedDate) {
-          url += `&selected_date=${selectedDate}`;
-        } else if (filter === "week" && weekStart) {
-          url += `&week_start=${weekStart}`;
-        }
-
-        const response = await fetch(url);
-        const data = await response.json();
-
-        console.log("Fetched pH level data:", data);
-
-        const processedData = processPhLevelData(data);
-        setPhLevelData(processedData);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching pH level data:", error);
-        setLoading(false);
+      if (!Array.isArray(data) || data.length === 0) {
+        console.log("No pH level data to process");
+        return {
+          labels: [],
+          datasets: [],
+        };
       }
-    };
-    fetchPhLevelData();
-  }, [filter, selectedDate, weekStart]); // refetch data when filter, selectedDate, or weekStart changes
 
-  const processPhLevelData = (data) => {
-    const labels =
-      filter === "3hours"
-        ? []
-        : [
+      if (filter === "3hours") {
+        const labels = [];
+        const phLevels = [];
+
+        data.forEach((entry) => {
+          const date = new Date(entry.timeData);
+          const timeLabel = `${date.getHours()}:00 ${date.toLocaleDateString()}`;
+          labels.push(timeLabel);
+          phLevels.push(entry.phlevel);
+        });
+
+        return {
+          labels,
+          datasets: [
+            {
+              label: "pH Level Every 3 Hours",
+              data: phLevels,
+              fill: false,
+              borderColor: "#4CAF50",
+              tension: 0.1,
+            },
+          ],
+        };
+      } else {
+        // For weekly view
+        const dailyData = {
+          0: [], // Monday
+          1: [], // Tuesday
+          2: [], // Wednesday
+          3: [], // Thursday
+          4: [], // Friday
+          5: [], // Saturday
+          6: [], // Sunday
+        };
+
+        // Group data by day
+        data.forEach((entry) => {
+          const date = new Date(entry.timeData);
+          // Convert Sunday (0) to 6, and other days to 0-5
+          const dayIndex = (date.getDay() + 6) % 7;
+          if (entry.phlevel != null) {
+            dailyData[dayIndex].push(entry.phlevel);
+          }
+        });
+
+        console.log("Grouped daily pH level data:", dailyData); // Debug log
+
+        // Calculate averages
+        const avgPhLevels = Object.values(dailyData).map((levels) => {
+          if (levels.length === 0) return 0;
+          const sum = levels.reduce((acc, level) => acc + level, 0);
+          return parseFloat((sum / levels.length).toFixed(2));
+        });
+
+        console.log("Calculated pH level averages:", avgPhLevels); // Debug log
+
+        return {
+          labels: [
             "Monday",
             "Tuesday",
             "Wednesday",
@@ -68,82 +106,117 @@ export const LineGraphPH = () => {
             "Friday",
             "Saturday",
             "Sunday",
-          ];
-    const phLevels =
-      filter === "3hours" ? [] : [8, 7.5, 7, 6.5, 6, 5.5].map(() => []);
-
-    const dailyPhLevels = Array(7)
-      .fill(0)
-      .map(() => []);
-
-    data.forEach((entry) => {
-      const date = new Date(entry.timeData);
-      const phLevel = entry.phlevel;
-
-      if (filter === "3hours") {
-        const timeLabel = `${date.getHours()}:00 ${date.toLocaleDateString()}`;
-        labels.push(timeLabel);
-        phLevels.push(phLevel);
-      } else {
-        const dayIndex = date.getDay();
-        if (dayIndex >= 1) {
-          dailyPhLevels[dayIndex - 1].push(phLevel);
-        }
+          ],
+          datasets: [
+            {
+              label: "Average pH Level",
+              data: avgPhLevels,
+              fill: false,
+              borderColor: "#4CAF50",
+              tension: 0.1,
+            },
+          ],
+        };
       }
-    });
-
-    const avgPhLevels = dailyPhLevels.map((phArray) => {
-      if (phArray.length === 0) return 0;
-      return phArray.reduce((sum, ph) => sum + ph, 0) / phArray.length;
-    });
-
-    return {
-      labels:
-        filter === "3hours"
-          ? labels
-          : [
-              "Monday",
-              "Tuesday",
-              "Wednesday",
-              "Thursday",
-              "Friday",
-              "Saturday",
-              "Sunday",
-            ],
-      datasets: [
-        {
-          label:
-            filter === "3hours" ? "pH Level Every 3 Hours" : "Average pH Level",
-          data: filter === "3hours" ? phLevels : avgPhLevels,
-          fill: false,
-          borderColor: "#4CAF50",
-          tension: 0.1,
-        },
-      ],
-    };
-  };
-
-  const options = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: "top",
-      },
-      title: {
-        display: true,
-        text:
-          filter === "3hours" ? "pH Level Every 3 Hours" : "Weekly pH Level",
-      },
     },
-  };
+    [filter]
+  );
 
-  return loading ? (
-    <div>Loading...</div>
-  ) : (
-    <div className="w-full max-w-screen-lg mx-auto">
+  const fetchPhLevelData = useCallback(async () => {
+    try {
+      const cacheKey = `${filter}-${selectedDate}-${weekStart}`;
+
+      if (cache[cacheKey]) {
+        console.log("Using cached pH level data for:", cacheKey);
+        setPhLevelData(cache[cacheKey]);
+        setLoading(false);
+        return;
+      }
+
+      let url = `http://127.0.0.1:5000/filtered-phlevel-data?filter=${filter}`;
+
+      if (filter === "date" && selectedDate) {
+        url += `&selected_date=${selectedDate}`;
+      } else if (filter === "week" && weekStart) {
+        url += `&week_start=${weekStart}`;
+      }
+
+      console.log("Fetching pH level data from:", url); // Debug log
+
+      setLoading(true);
+      const response = await fetch(url);
+      const data = await response.json();
+
+      console.log("Raw pH level data from API:", data); // Debug log
+
+      if (!Array.isArray(data)) {
+        console.error("Invalid pH level data format received:", data);
+        setLoading(false);
+        return;
+      }
+
+      const processedData = processPhLevelData(data);
+      console.log("Processed pH level data:", processedData); // Debug log
+
+      setCache((prevCache) => ({
+        ...prevCache,
+        [cacheKey]: processedData,
+      }));
+
+      setPhLevelData(processedData);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching pH level data:", error);
+      setLoading(false);
+    }
+  }, [filter, selectedDate, weekStart, cache, processPhLevelData]);
+
+  useEffect(() => {
+    fetchPhLevelData();
+  }, [fetchPhLevelData]);
+
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "top",
+        },
+        title: {
+          display: true,
+          text:
+            filter === "3hours" ? "pH Level Every 3 Hours" : "Weekly pH Level",
+        },
+      },
+      scales: {
+        y: {
+          beginAtZero: false,
+          min: 0,
+          max: 14,
+          ticks: {
+            callback: (value) => `pH ${value}`,
+          },
+        },
+      },
+    }),
+    [filter]
+  );
+
+  const LoadingSpinner = () => (
+    <div className="flex justify-center items-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+    </div>
+  );
+
+  return (
+    <div className="w-full max-w-screen-lg mx-auto p-4">
       <div className="mb-4">
-        <label>Filter: </label>
-        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+        <label className="mr-2">Filter: </label>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="p-2 border rounded"
+        >
           <option value="weekly">Weekly</option>
           <option value="3hours">Every 3 Hours</option>
           <option value="date">By Date</option>
@@ -151,33 +224,40 @@ export const LineGraphPH = () => {
         </select>
       </div>
 
-      {/* Show input fields based on selected filter */}
       {filter === "date" && (
         <div className="mb-4">
-          <label>Select Date: </label>
+          <label className="mr-2">Select Date: </label>
           <input
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
+            className="p-2 border rounded"
           />
         </div>
       )}
 
       {filter === "week" && (
         <div className="mb-4">
-          <label>Select Week Start (Sunday): </label>
+          <label className="mr-2">Select Week Start (Sunday): </label>
           <input
             type="date"
             value={weekStart}
             onChange={(e) => setWeekStart(e.target.value)}
+            className="p-2 border rounded"
           />
         </div>
       )}
 
-      {phLevelData.labels.length > 0 ? (
-        <Line options={options} data={phLevelData} />
+      {loading ? (
+        <LoadingSpinner />
+      ) : phLevelData?.labels?.length > 0 ? (
+        <div className="bg-white p-4 rounded-lg shadow">
+          <Line options={options} data={phLevelData} />
+        </div>
       ) : (
-        <div>No data available to display</div>
+        <div className="text-center py-4 text-gray-600">
+          No data available to display
+        </div>
       )}
     </div>
   );

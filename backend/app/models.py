@@ -17,11 +17,6 @@ class aquamans(db.Model):
     timeData = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     dead_catfish_image = db.Column(db.LargeBinary, nullable=True)
 
-    __table_args__ = (
-        Index('idx_timedata', 'timeData'),
-        Index('idx_temp_oxygen', 'temperature', 'oxygen'),
-        Index('idx_dead_catfish', 'dead_catfish'),
-    )
 
     def __repr__(self):
         return f'<aquamans {self.id}>'
