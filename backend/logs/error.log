@@ -1,0 +1,5 @@
+2025-02-28 22:54:06,512 - app.routes.video_routes - ERROR - Failed to read initial frame
+2025-02-28 22:55:27,990 - app.routes.video_routes - ERROR - Failed to read initial frame
+2025-02-28 22:55:35,189 - app.routes.video_routes - ERROR - Failed to read initial frame
+2025-02-28 22:57:41,048 - app.routes.video_routes - ERROR - Failed to capture test frame
+2025-02-28 22:57:41,062 - app.routes.video_routes - ERROR - Camera initialization failed

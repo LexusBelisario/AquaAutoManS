@@ -42,7 +42,7 @@ session.mount("http://", adapter)
 session.mount("https://", adapter)
 
 # Load YOLO model
-model = YOLO("C:/Users/user/AquaAutoManS/machine_learning/weights/best1.pt")
+model = YOLO("C:/Users/ADMIN/AquaAutoManS/machine_learning/weights/best1.pt")
 class_names = ["catfish", "dead_catfish"]
 
 # Initialize video capture
