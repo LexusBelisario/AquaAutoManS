@@ -222,3 +222,5 @@ def detection_status():
     except Exception as e:
         logger.error(f"Error getting detection status: {str(e)}")
         return jsonify({'error': str(e)}), 500
+    
+    # pastillas
