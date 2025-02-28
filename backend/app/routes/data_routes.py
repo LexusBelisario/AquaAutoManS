@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+from flask_caching import Cache
 from app.services.data_service import DataService
 from app import cache
 from app.utils.limiters import limiter
@@ -8,14 +9,20 @@ import logging
 bp = Blueprint('data', __name__)
 data_service = DataService()
 
-bp = Blueprint('data', __name__)
-data_service = DataService()
+cache = Cache(config={'CACHE_TYPE': 'simple'})
 
 @bp.route('/data', methods=['GET'])
 @limiter.exempt
 def get_data():
-    date_filter = request.args.get('date')
-    return data_service.get_data(date_filter)
+    try:
+        date_filter = request.args.get('date')
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        return data_service.get_data(date_filter, page, per_page)
+    except Exception as e:
+        logging.error(f"Error in get_data route: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/temperature-data', methods=['GET'])
 @limiter.exempt

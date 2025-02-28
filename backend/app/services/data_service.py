@@ -10,44 +10,64 @@ from io import BytesIO
 from PIL import Image
 
 class DataService:
-    def get_data(self, date_filter):
+    def get_data(self, date_filter, page=1, per_page=10):
         try:
-            if date_filter:
-                try:
-                    filter_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
-                except ValueError:
-                    return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
-            else:
-                filter_date = None
+            page = int(page)
+            per_page = int(per_page)
+            
+            offset = (page - 1) * per_page
 
             with db.engine.connect() as connection:
-                if filter_date:
-                    query = """
-                        SELECT * FROM aquamans
-                        WHERE DATE(timeData) = :filter_date
-                    """
-                    result = connection.execute(text(query), {'filter_date': filter_date})
-                else:
-                    query = "SELECT * FROM aquamans"
-                    result = connection.execute(text(query))
+                base_query = "FROM aquamans"
+                where_clause = ""
+                params = {'limit': per_page, 'offset': offset}
 
+                if date_filter:
+                    try:
+                        filter_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
+                        where_clause = "WHERE DATE(timeData) = :filter_date"
+                        params['filter_date'] = filter_date
+                    except ValueError:
+                        return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
+
+                # Count total records
+                count_query = f"SELECT COUNT(*) {base_query} {where_clause}"
+                total = connection.execute(text(count_query), params).scalar()
+
+                # Get paginated data
+                data_query = f"""
+                    SELECT *
+                    {base_query}
+                    {where_clause}
+                    ORDER BY timeData DESC
+                    LIMIT :limit OFFSET :offset
+                """
+                
+                result = connection.execute(text(data_query), params)
+                
+                # Convert rows to dictionaries
                 records = []
                 for row in result:
                     record = dict(zip(result.keys(), row))
-                    
+                    # Handle any binary data conversion if needed
                     for key, value in record.items():
                         if isinstance(value, bytes):
                             record[key] = base64.b64encode(value).decode('utf-8')
-
+                        elif isinstance(value, datetime):
+                            record[key] = value.isoformat()
                     records.append(record)
 
-                if not records:
-                    return jsonify({"message": "No data found for the selected date."}), 404
-
-                return jsonify(records)
+                # Return paginated response
+                return jsonify({
+                    'data': records,
+                    'total': total,
+                    'page': page,
+                    'per_page': per_page,
+                    'total_pages': (total + per_page - 1) // per_page
+                })
 
         except Exception as e:
-            logging.error(f"Error fetching data: {e}")
+            logging.error(f"Error in get_data: {str(e)}")
             return jsonify({'error': str(e)}), 500
 
     def get_temperature_data(self):

@@ -9,140 +9,149 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib import colors
+from flask import Response
+from io import StringIO
+import csv
 
 class ReportService:
-    def check_dead_catfish(self):
+    def print_data_report(self, time_filter, date_filter):
         try:
-            dead_catfish_records = aquamans.query.filter(aquamans.dead_catfish > 0).order_by(aquamans.timeData.desc()).all()
-
-            if not dead_catfish_records:
-                latest_record = aquamans.query.order_by(aquamans.id.desc()).first()
-                if latest_record:
-                    if (latest_record.temperature == 0 and
-                        latest_record.oxygen == 0 and
-                        latest_record.phlevel == 0 and
-                        latest_record.turbidity == 0):
-                        return jsonify({
-                            'message': 'No valid data available in the system.',
-                        })
-
-                    return jsonify({
-                        'message': 'No dead catfish detected in the system.',
-                        'latest_data': {
-                            'temperature': latest_record.temperature,
-                            'oxygen': latest_record.oxygen,
-                            'phlevel': latest_record.phlevel,
-                            'turbidity': latest_record.turbidity
-                        }
-                    })
-
-            latest_record = dead_catfish_records[0]
-
-            if (latest_record.temperature == 0 and
-                latest_record.oxygen == 0 and
-                latest_record.phlevel == 0 and
-                latest_record.turbidity == 0):
-                return jsonify({
-                    'message': 'No valid data available in the system.',
-                })
-
-            possible_causes = []
-
-            # Temperature Analysis
-            temperature_possibilities = []
-            if 26 <= latest_record.temperature <= 32:
-                temperature_status = "The Water had a Normal Temperature"
-            elif 20 < latest_record.temperature < 26:
-                temperature_status = "The Water had a Below Average Temperature"
-                temperature_possibilities.extend(["Sub Par Cold Temperature in Environment", "Cold Water was used"])
-            elif latest_record.temperature <= 20:
-                temperature_status = "The Water had a Cold Temperature"
-                temperature_possibilities.extend(["Cold Temperature in Environment", "Cold Water was used", "Cold Wind"])
-            elif 26 < latest_record.temperature < 35:
-                temperature_status = "The Water had an Above Average Temperature"
-                temperature_possibilities.extend(["Hot Temperature in Environment", "Lukewarm Water was used", "Slightly Exposed to a Sunlight"])
-            elif latest_record.temperature >= 35:
-                temperature_status = "The Water had a Hot Temperature"
-                temperature_possibilities.extend(["Very Hot Temperature in Environment", "Boiling Water was used", "Full Exposure to Sunlight"])
-                
-            if temperature_possibilities:
-                temp_cause_message = f"The Temperature suggests the presence of: {', '.join(temperature_possibilities)}."
-                possible_causes.append(temp_cause_message)
-
-            # Oxygen Analysis
-            oxygen_possibilities = []
-            if latest_record.oxygen <= 0.8:
-                oxygen_status = "The Water had a Very Low Oxygen"
-                oxygen_possibilities.extend(["Overstocking of Catfish", "Stagnant Water", "No Ventilation", "Overfeeding"])
-            elif latest_record.oxygen < 1.5:
-                oxygen_status = "The Water had a Low Oxygen"
-                oxygen_possibilities.extend(["High Volumes of Catfish", "Low Movement of Water", "Little Ventilation"])
-            elif 1.5 <= latest_record.oxygen <= 5:
-                oxygen_status = "The Water had a Normal Oxygen"
+            # Validate and set up date/time filters
+            if time_filter > 0:
+                if date_filter:
+                    filter_date = datetime.strptime(date_filter, "%Y-%m-%d")
+                    if filter_date.date() != datetime.today().date():
+                        return jsonify({"message": "3 hours report only works with today's date."}), 400
+                else:
+                    filter_date = datetime.now()
             else:
-                oxygen_status = "The Water had a High Oxygen"
-                oxygen_possibilities.extend(["Over-aeration of Water", "Chemicals", "Hyperoxygenation"])
+                if date_filter:
+                    filter_date = datetime.strptime(date_filter, "%Y-%m-%d")
+                else:
+                    filter_date = datetime.now()
+
+            if time_filter > 0:
+                start_time = filter_date - timedelta(hours=time_filter)
+            else:
+                start_time = filter_date.replace(hour=0, minute=0, second=0, microsecond=0)
             
-            if oxygen_possibilities:
-                oxygen_cause_message = f"The Oxygen Level suggests the presence of: {', '. join(oxygen_possibilities)}."
-                possible_causes.append(oxygen_cause_message)
+            end_time = filter_date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-            # pH Analysis
-            ph_possibilities = []
-            if latest_record.phlevel < 4:
-                ph_status = "The Water was Very Acidic"
-                ph_possibilities.extend(["Baking Soda", "Acid Rain", "Vinegar"])
-            elif 4 <= latest_record.phlevel < 6:
-                ph_status = "The Water was Acidic"
-                ph_possibilities.extend(["Acidic Products", "Coffee"])
-            elif 6 <= latest_record.phlevel <= 7.5:
-                ph_status = "The Water was Normal pH Level"
-            elif 7.6 <= latest_record.phlevel <= 8.9:
-                ph_status = "The Water was Alkaline"
-                ph_possibilities.extend(["Saltwater"])
-            elif latest_record.phlevel > 9:
-                ph_status = "The Water was Very Alkaline"
-                ph_possibilities.extend(["Dishwashing Liquid", "Ammonia Solution", "Bleach", "Soap"])
+            # Optimize query by selecting only needed columns and using chunk processing
+            chunk_size = 1000
+            output = StringIO()
+            writer = csv.writer(output)
 
-            if ph_possibilities:
-                ph_cause_message = f"The pH level suggests the presence of: {', '.join(ph_possibilities)}."
-                possible_causes.append(ph_cause_message)
+            # Write headers
+            headers = ['Time', 'Temperature', 'Temperature Result', 'Oxygen', 'Oxygen Result', 
+                    'pH Level', 'pH Level Result', 'Turbidity', 'Turbidity Result',
+                    'Alive Catfish', 'Dead Catfish']
+            writer.writerow(headers)
 
-            if temperature_status != "The Water had a Normal Temperature":
-                possible_causes.append(temperature_status)
-            if oxygen_status != "The Water had a Normal Oxygen":
-                possible_causes.append(oxygen_status)
-            if ph_status != "The Water was Normal pH Level":
-                possible_causes.append(ph_status)
-
-            possible_causes_message = " \n"
-            for cause in possible_causes:
-                possible_causes_message += f" {cause}\n"
-
-            message = {
-                "alert": "A catfish has died! Please remove it immediately.",
-                "details": {
-                    "temperature": latest_record.temperature,
-                    "temperature_status": temperature_status,
-                    "oxygen": latest_record.oxygen,
-                    "oxygen_status": oxygen_status,
-                    "phlevel": latest_record.phlevel,
-                    "phlevel_status": ph_status,
-                    "turbidity": latest_record.turbidity,
-                    "turbidity_status": latest_record.turbidityResult,
-                    "dead_catfish_count": latest_record.dead_catfish,
-                    "time_detected": latest_record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
-                    "note": "These possiblities most likely have stressed the Catfish(es). Please Remove the dead catfish immediately to avoid water contamination.",
-                    "possible_causes": possible_causes_message.strip(),
-                },
+            # Initialize totals
+            totals = {
+                'temperature': 0,
+                'oxygen': 0,
+                'phlevel': 0,
+                'turbidity': 0,
+                'count': 0
             }
-            logging.warning(f"Dead catfish detected: {message}")
-            return jsonify(message)
+
+            # Process data in chunks
+            query = db.session.query(
+                aquamans.timeData,
+                aquamans.temperature,
+                aquamans.tempResult,
+                aquamans.oxygen,
+                aquamans.oxygenResult,
+                aquamans.phlevel,
+                aquamans.phResult,
+                aquamans.turbidity,
+                aquamans.turbidityResult,
+                aquamans.catfish,
+                aquamans.dead_catfish
+            ).filter(
+                aquamans.timeData.between(start_time, end_time)
+            ).order_by(aquamans.timeData)
+
+            # Process in chunks to avoid memory issues
+            offset = 0
+            while True:
+                chunk = query.limit(chunk_size).offset(offset).all()
+                if not chunk:
+                    break
+
+                for record in chunk:
+                    writer.writerow([
+                        record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
+                        f"{record.temperature:.2f}",
+                        record.tempResult,
+                        f"{record.oxygen:.2f}",
+                        record.oxygenResult,
+                        f"{record.phlevel:.2f}",
+                        record.phResult,
+                        f"{record.turbidity:.2f}",
+                        record.turbidityResult,
+                        record.catfish,
+                        record.dead_catfish
+                    ])
+
+                    # Update totals
+                    totals['temperature'] += float(record.temperature or 0)
+                    totals['oxygen'] += float(record.oxygen or 0)
+                    totals['phlevel'] += float(record.phlevel or 0)
+                    totals['turbidity'] += float(record.turbidity or 0)
+                    totals['count'] += 1
+
+                offset += chunk_size
+
+            if totals['count'] == 0:
+                return jsonify({"message": "No records found in the selected time range."})
+
+            # Add empty row and averages
+            writer.writerow([])
+            writer.writerow(['AVERAGES'])
+            writer.writerow([
+                '',  # Time column
+                f"{totals['temperature']/totals['count']:.2f}",  # Temperature
+                'Average Temperature',
+                f"{totals['oxygen']/totals['count']:.2f}",  # Oxygen
+                'Average Oxygen',
+                f"{totals['phlevel']/totals['count']:.2f}",  # pH
+                'Average pH',
+                f"{totals['turbidity']/totals['count']:.2f}",  # Turbidity
+                'Average Turbidity'
+            ])
+
+            # Generate filename
+            if time_filter > 0:
+                filename = f"aquamans_report_{time_filter}hours_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
+            else:
+                filename = f"aquamans_report_{filter_date.strftime('%Y%m%d')}.csv"
+
+            # Get the CSV data and reset the pointer
+            output.seek(0)
+            csv_data = output.getvalue()
+            output.close()
+
+            # Create response with appropriate headers
+            response = Response(
+                csv_data,
+                mimetype='text/csv',
+                headers={
+                    'Content-Disposition': f'attachment; filename={filename}',
+                    'Content-Type': 'text/csv',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            )
+
+            return response
 
         except Exception as e:
-            logging.error(f"Error checking for dead catfish: {e}")
-            return jsonify({'error': str(e)})
-
+            logging.error(f"Error generating report: {str(e)}")
+            return jsonify({"message": "An error occurred while generating the report."}), 500
+    
     def print_dead_catfish_report(self, alert_id):
         try:
             print("Alert ID received:", alert_id)
