@@ -28,28 +28,44 @@ export const LineGraphTemp = () => {
   const [selectedDate, setSelectedDate] = useState("");
   const [weekStart, setWeekStart] = useState("");
   const [cache, setCache] = useState({});
+  const [error, setError] = useState(null);
 
   const processTemperatureData = useMemo(
     () => (data) => {
-      console.log("Processing data:", data); // Debug log
+      console.log("Raw data received:", data);
 
       if (!Array.isArray(data) || data.length === 0) {
-        console.log("No data to process");
+        console.log("No data to process or invalid data format");
         return {
           labels: [],
           datasets: [],
         };
       }
 
+      // Create a map to store data by day
+      const dailyData = new Map();
+      const dayLabels = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+      ];
+
       if (filter === "3hours") {
+        // Process 3-hour data
         const labels = [];
         const temperatures = [];
 
         data.forEach((entry) => {
-          const date = new Date(entry.timeData);
-          const timeLabel = `${date.getHours()}:00 ${date.toLocaleDateString()}`;
-          labels.push(timeLabel);
-          temperatures.push(entry.temperature);
+          if (entry.temperature != null) {
+            const date = new Date(entry.timeData);
+            const timeLabel = `${date.getHours()}:00 ${date.toLocaleDateString()}`;
+            labels.push(timeLabel);
+            temperatures.push(parseFloat(entry.temperature));
+          }
         });
 
         return {
@@ -65,52 +81,39 @@ export const LineGraphTemp = () => {
           ],
         };
       } else {
-        // For weekly view
-        const dailyData = {
-          0: [], // Monday
-          1: [], // Tuesday
-          2: [], // Wednesday
-          3: [], // Thursday
-          4: [], // Friday
-          5: [], // Saturday
-          6: [], // Sunday
-        };
-
-        // Group data by day
+        // Process weekly/daily data
         data.forEach((entry) => {
-          const date = new Date(entry.timeData);
-          // Convert Sunday (0) to 6, and other days to 0-5
-          const dayIndex = (date.getDay() + 6) % 7;
           if (entry.temperature != null) {
-            dailyData[dayIndex].push(entry.temperature);
+            const date = new Date(entry.timeData);
+            const dayIndex = (date.getDay() + 6) % 7; // Convert Sunday (0) to 6
+            const dayName = dayLabels[dayIndex];
+
+            if (!dailyData.has(dayName)) {
+              dailyData.set(dayName, []);
+            }
+            dailyData.get(dayName).push(parseFloat(entry.temperature));
           }
         });
 
-        console.log("Grouped daily data:", dailyData); // Debug log
-
-        // Calculate averages
-        const avgTemperatures = Object.values(dailyData).map((temps) => {
-          if (temps.length === 0) return 0;
-          const sum = temps.reduce((acc, temp) => acc + temp, 0);
-          return parseFloat((sum / temps.length).toFixed(2));
+        // Calculate averages for each day
+        const averages = dayLabels.map((day) => {
+          const temperatures = dailyData.get(day) || [];
+          if (temperatures.length === 0) return 0;
+          const sum = temperatures.reduce((acc, val) => acc + val, 0);
+          return parseFloat((sum / temperatures.length).toFixed(2));
         });
 
-        console.log("Calculated averages:", avgTemperatures); // Debug log
+        console.log("Processed daily averages:", {
+          labels: dayLabels,
+          averages: averages,
+        });
 
         return {
-          labels: [
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-            "Sunday",
-          ],
+          labels: dayLabels,
           datasets: [
             {
               label: "Average Temperature",
-              data: avgTemperatures,
+              data: averages,
               fill: false,
               borderColor: "#FF5F1F",
               tension: 0.1,
@@ -124,6 +127,7 @@ export const LineGraphTemp = () => {
 
   const fetchTemperatureData = useCallback(async () => {
     try {
+      setError(null);
       const cacheKey = `${filter}-${selectedDate}-${weekStart}`;
 
       if (cache[cacheKey]) {
@@ -141,22 +145,23 @@ export const LineGraphTemp = () => {
         url += `&week_start=${weekStart}`;
       }
 
-      console.log("Fetching data from:", url); // Debug log
-
+      console.log("Fetching data from:", url);
       setLoading(true);
+
       const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
+      console.log("Data received from API:", data);
 
-      console.log("Raw data from API:", data); // Debug log
-
-      if (!Array.isArray(data)) {
-        console.error("Invalid data format received:", data);
-        setLoading(false);
-        return;
+      if (data.error) {
+        throw new Error(data.error);
       }
 
       const processedData = processTemperatureData(data);
-      console.log("Processed data:", processedData); // Debug log
+      console.log("Processed temperature data:", processedData);
 
       setCache((prevCache) => ({
         ...prevCache,
@@ -164,9 +169,10 @@ export const LineGraphTemp = () => {
       }));
 
       setTemperatureData(processedData);
-      setLoading(false);
     } catch (error) {
       console.error("Error fetching temperature data:", error);
+      setError(error.message);
+    } finally {
       setLoading(false);
     }
   }, [filter, selectedDate, weekStart, cache, processTemperatureData]);
@@ -188,15 +194,37 @@ export const LineGraphTemp = () => {
             filter === "3hours"
               ? "Temperature Every 3 Hours"
               : "Weekly Temperature",
+          font: {
+            size: 16,
+          },
+        },
+        tooltip: {
+          callbacks: {
+            label: (context) => `Temperature: ${context.raw}°C`,
+          },
         },
       },
       scales: {
         y: {
           beginAtZero: true,
+          title: {
+            display: true,
+            text: "Temperature (°C)",
+          },
           ticks: {
             callback: (value) => `${value}°C`,
           },
         },
+        x: {
+          title: {
+            display: true,
+            text: filter === "3hours" ? "Time" : "Day of Week",
+          },
+        },
+      },
+      interaction: {
+        intersect: false,
+        mode: "index",
       },
     }),
     [filter]
@@ -210,55 +238,63 @@ export const LineGraphTemp = () => {
 
   return (
     <div className="w-full max-w-screen-lg mx-auto p-4">
-      <div className="mb-4">
-        <label className="mr-2">Filter: </label>
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="p-2 border rounded"
-        >
-          <option value="weekly">Weekly</option>
-          <option value="3hours">Every 3 Hours</option>
-          <option value="date">By Date</option>
-          <option value="week">By Week</option>
-        </select>
+      <div className="mb-4 flex items-center gap-4">
+        <div>
+          <label className="mr-2 font-medium">Filter: </label>
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="p-2 border rounded hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="weekly">Weekly</option>
+            <option value="3hours">Every 3 Hours</option>
+            <option value="date">By Date</option>
+            <option value="week">By Week</option>
+          </select>
+        </div>
+
+        {filter === "date" && (
+          <div>
+            <label className="mr-2 font-medium">Select Date: </label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="p-2 border rounded hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        )}
+
+        {filter === "week" && (
+          <div>
+            <label className="mr-2 font-medium">Select Week Start: </label>
+            <input
+              type="date"
+              value={weekStart}
+              onChange={(e) => setWeekStart(e.target.value)}
+              className="p-2 border rounded hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        )}
       </div>
 
-      {filter === "date" && (
-        <div className="mb-4">
-          <label className="mr-2">Select Date: </label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="p-2 border rounded"
-          />
+      {error && (
+        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          Error: {error}
         </div>
       )}
 
-      {filter === "week" && (
-        <div className="mb-4">
-          <label className="mr-2">Select Week Start (Sunday): </label>
-          <input
-            type="date"
-            value={weekStart}
-            onChange={(e) => setWeekStart(e.target.value)}
-            className="p-2 border rounded"
-          />
-        </div>
-      )}
-
-      {loading ? (
-        <LoadingSpinner />
-      ) : temperatureData?.labels?.length > 0 ? (
-        <div className="bg-white p-4 rounded-lg shadow">
+      <div className="bg-white p-6 rounded-lg shadow-lg">
+        {loading ? (
+          <LoadingSpinner />
+        ) : temperatureData?.labels?.length > 0 ? (
           <Line options={options} data={temperatureData} />
-        </div>
-      ) : (
-        <div className="text-center py-4 text-gray-600">
-          No data available to display
-        </div>
-      )}
+        ) : (
+          <div className="text-center py-4 text-gray-600">
+            No temperature data available for the selected period
+          </div>
+        )}
+      </div>
     </div>
   );
 };

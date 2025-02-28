@@ -16,20 +16,48 @@ import { LineGraphPH } from "../graphs/lineGraphPH";
 import { LineGraphTurb } from "../graphs/lineGraphTurb";
 import axios from "axios";
 import LiveVideoFeed from "./LiveVideoFeed";
+import WaterQualityAlertBox from "../components/WaterQualityAlertBox";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 export default function Homepage({ setAuth }) {
-  const [alerts, setAlerts] = useState([]);
-  const [catfishCounts, setCatfishCounts] = useState({ alive: 0, dead: 0 });
+  const [deadCatfishAlerts, setDeadCatfishAlerts] = useState([]);
+  const [waterQualityAlerts, setWaterQualityAlerts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  // Fetch water quality data
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchWaterQuality = async () => {
+      try {
+        const response = await axios.get(
+          "http://localhost:5000/check_water_quality"
+        );
+        if (response.data) {
+          setWaterQualityAlerts([response.data]);
+        }
+      } catch (error) {
+        console.error("Error fetching water quality data:", error);
+        setError(error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchWaterQuality();
+    const waterQualityInterval = setInterval(fetchWaterQuality, 5000);
+
+    return () => clearInterval(waterQualityInterval);
+  }, []);
+
+  // Fetch dead catfish data
+  useEffect(() => {
+    const fetchDeadCatfish = async () => {
       try {
         const response = await axios.get(
           "http://localhost:5000/check_dead_catfish"
         );
-
         if (response.data.alert) {
-          setAlerts((prevAlerts) => {
+          setDeadCatfishAlerts((prevAlerts) => {
             const newAlert = {
               message: response.data.alert,
               details: response.data.details,
@@ -46,12 +74,21 @@ export default function Homepage({ setAuth }) {
       }
     };
 
-    fetchData();
-    const intervalId = setInterval(fetchData, 2000);
-    return () => clearInterval(intervalId);
+    fetchDeadCatfish();
+    const deadCatfishInterval = setInterval(fetchDeadCatfish, 2000);
+    return () => clearInterval(deadCatfishInterval);
   }, []);
-  const removeAlert = (index) => {
-    setAlerts((prevAlerts) => prevAlerts.filter((_, i) => i !== index));
+
+  const removeWaterQualityAlert = (alertId) => {
+    setWaterQualityAlerts((prevAlerts) =>
+      prevAlerts.filter((alert) => alert.details.alert_id !== alertId)
+    );
+  };
+
+  const removeDeadCatfishAlert = (index) => {
+    setDeadCatfishAlerts((prevAlerts) =>
+      prevAlerts.filter((_, i) => i !== index)
+    );
   };
 
   return (
@@ -72,7 +109,7 @@ export default function Homepage({ setAuth }) {
         <div className="flex-1 flex flex-col ml-64 p-4 space-y-10">
           {/* Dashboard Components */}
           <div className="flex flex-col items-start">
-            <p className=" text-2xl font-bold mb-2">Dashboard</p>
+            <p className="text-2xl font-bold mb-2">Dashboard</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-36">
               <Temperature />
               <Oxygen />
@@ -94,7 +131,16 @@ export default function Homepage({ setAuth }) {
           {/* Alert Box */}
           <div>
             <p className="text-2xl font-bold mb-4">Alert Notifications</p>
-            <AlertBox alerts={alerts} removeAlert={removeAlert} />
+            <ErrorBoundary>
+              <WaterQualityAlertBox
+                alerts={waterQualityAlerts}
+                removeAlert={removeWaterQualityAlert}
+              />
+            </ErrorBoundary>
+            <AlertBox
+              alerts={deadCatfishAlerts}
+              removeAlert={removeDeadCatfishAlert}
+            />
             <p className="text-2xl font-bold my-4">Image Notifications</p>
             <PictureBox />
           </div>
@@ -112,7 +158,6 @@ export default function Homepage({ setAuth }) {
 
           {/* Live Monitoring Feed */}
           <div>
-            {" "}
             <p className="text-2xl font-bold mb-8">Live Monitoring</p>
             <div className="min-h-screen bg-[#F0F8FF] overflow-hidden">
               <LiveVideoFeed />

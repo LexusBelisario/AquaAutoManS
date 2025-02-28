@@ -144,7 +144,9 @@ class ReportService:
 
     def print_dead_catfish_report(self, alert_id):
         try:
-            print("Alert ID received:", alert_id)
+            logging.info(f"Starting dead catfish report generation for alert ID: {alert_id}")
+            
+            # Get the latest dead catfish record
             latest_dead_record = (
                 aquamans.query.filter(aquamans.dead_catfish > 0)
                 .order_by(aquamans.timeData.desc())
@@ -154,6 +156,7 @@ class ReportService:
             if not latest_dead_record:
                 return jsonify({"message": "No dead catfish detected in the system."})
 
+            # Get data from 3 hours before the incident
             three_hours_ago = latest_dead_record.timeData - timedelta(hours=3)
             recent_data = (
                 aquamans.query.filter(
@@ -163,70 +166,280 @@ class ReportService:
                 .all()
             )
 
-            data = [["ID", "Temperature (°C)", "Oxygen (mg/L)", "pH", "Turbidity (NTU)", 
-                    "Alive Catfish", "Dead Catfish", "Time"]]
-            
-            total_catfish = 0 
-            total_dead_catfish = 0 
+            logging.info(f"Found {len(recent_data)} records in the 3-hour window")
 
+            # Initialize totals for analysis
+            totals = {
+                'temperature': 0,
+                'oxygen': 0,
+                'phlevel': 0,
+                'turbidity': 0,
+                'count': 0,
+                'alive_catfish': 0,
+                'dead_catfish': 0
+            }
+
+            # Prepare data table
+            data = [["Time", "Temperature (°C)", "Result", "Oxygen (mg/L)", "Result", 
+                    "pH Level", "Result", "Turbidity (NTU)", "Result", 
+                    "Alive Catfish", "Dead Catfish"]]
+
+            # Process data
             for record in recent_data:
-                total_catfish += record.catfish + record.dead_catfish
-                total_dead_catfish += record.dead_catfish
-
-                data.append([ 
-                    record.id,
-                    f"{record.temperature:.1f}",
+                time_str = record.timeData.strftime("%Y-%m-%d %H:%M:%S")
+                data.append([
+                    time_str,
+                    f"{record.temperature:.2f}",
+                    record.tempResult,
                     f"{record.oxygen:.2f}",
+                    record.oxygenResult,
                     f"{record.phlevel:.2f}",
+                    record.phResult,
                     f"{record.turbidity:.2f}",
-                    int(record.catfish),
-                    int(record.dead_catfish),
-                    record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
+                    record.turbidityResult,
+                    str(record.catfish),
+                    str(record.dead_catfish)
                 ])
 
-            mortality_rate = (total_dead_catfish / total_catfish) * 100 if total_catfish > 0 else 0
+                # Update totals
+                totals['temperature'] += float(record.temperature or 0)
+                totals['oxygen'] += float(record.oxygen or 0)
+                totals['phlevel'] += float(record.phlevel or 0)
+                totals['turbidity'] += float(record.turbidity or 0)
+                totals['alive_catfish'] += float(record.catfish or 0)
+                totals['dead_catfish'] += float(record.dead_catfish or 0)
+                totals['count'] += 1
 
-            # Generate analysis message
-            result_message = self._generate_analysis_message(latest_dead_record, mortality_rate)
+            # Calculate mortality rate
+            total_catfish = totals['alive_catfish'] + totals['dead_catfish']
+            mortality_rate = (totals['dead_catfish'] / total_catfish * 100) if total_catfish > 0 else 0
 
             # Create PDF
-            output_pdf = BytesIO()
-            pdf = SimpleDocTemplate(output_pdf, pagesize=letter)
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=landscape(letter),
+                rightMargin=36,
+                leftMargin=36,
+                topMargin=36,
+                bottomMargin=36
+            )
+
+            # Define styles
             styles = getSampleStyleSheet()
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=16,
+                spaceAfter=30,
+                alignment=1  # Center alignment
+            )
+            heading2_style = ParagraphStyle(
+                'CustomHeading2',
+                parent=styles['Heading2'],
+                fontSize=14,
+                spaceAfter=12
+            )
+            normal_style = ParagraphStyle(
+                'CustomNormal',
+                parent=styles['Normal'],
+                fontSize=10,
+                leading=12
+            )
+            warning_style = ParagraphStyle(
+                'WarningStyle',
+                parent=styles['Normal'],
+                fontSize=12,
+                textColor=colors.red,
+                leading=14
+            )
+
+            # Create story for PDF
             story = []
 
-            # Add table
-            table = Table(data, colWidths=[35, 55, 55, 55, 55, 45, 45, 80])
+            # Add title and alert
+            story.append(Paragraph("Dead Catfish Incident Report", title_style))
+            story.append(Paragraph(
+                f"<b>ALERT:</b> Dead catfish detected at {latest_dead_record.timeData.strftime('%Y-%m-%d %H:%M:%S')}",
+                warning_style
+            ))
+            story.append(Spacer(1, 12))
+
+            # Add incident summary
+            story.append(Paragraph("Incident Summary", heading2_style))
+            incident_summary = [
+                ["Time of Death", "Total Catfish", "Dead Catfish", "Mortality Rate"],
+                [
+                    latest_dead_record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
+                    str(int(total_catfish)),
+                    str(int(totals['dead_catfish'])),
+                    f"{mortality_rate:.2f}%"
+                ]
+            ]
+            summary_table = Table(incident_summary)
+            summary_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ]))
+            story.append(summary_table)
+            story.append(Spacer(1, 20))
+
+            # Add water parameters at time of death
+            story.append(Paragraph("Water Parameters at Time of Death", heading2_style))
+            death_params = [
+                ["Parameter", "Value", "Status", "Normal Range"],
+                ["Temperature", f"{latest_dead_record.temperature:.2f}°C", 
+                self._get_temp_status(latest_dead_record.temperature), "26-32°C"],
+                ["Oxygen", f"{latest_dead_record.oxygen:.2f} mg/L",
+                self._get_oxygen_status(latest_dead_record.oxygen), "1.5-5.0 mg/L"],
+                ["pH Level", f"{latest_dead_record.phlevel:.2f}",
+                self._get_ph_status(latest_dead_record.phlevel), "6.0-7.5"],
+                ["Turbidity", f"{latest_dead_record.turbidity:.2f} NTU",
+                self._get_turbidity_status(latest_dead_record.turbidity), "<20 NTU"]
+            ]
+            params_table = Table(death_params, colWidths=[100, 100, 100, 100])
+            params_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ]))
+            story.append(params_table)
+            story.append(Spacer(1, 20))
+
+            # Add critical factors analysis
+            story.append(Paragraph("Critical Factors Analysis", heading2_style))
+            critical_factors = []
+
+            # Analyze temperature
+            if latest_dead_record.temperature <= 20 or latest_dead_record.temperature >= 35:
+                critical_factors.append(
+                    f"• Temperature ({latest_dead_record.temperature:.1f}°C) was at dangerous levels\n"
+                    f"  Possible causes: {self._get_temperature_causes(latest_dead_record.temperature)}"
+                )
+            elif 20 < latest_dead_record.temperature < 26 or 32 <= latest_dead_record.temperature < 35:
+                critical_factors.append(
+                    f"• Temperature ({latest_dead_record.temperature:.1f}°C) was at suboptimal levels\n"
+                    f"  Possible causes: {self._get_temperature_causes(latest_dead_record.temperature)}"
+                )
+
+            # Analyze oxygen
+            if latest_dead_record.oxygen <= 0.8:
+                critical_factors.append(
+                    f"• Oxygen level ({latest_dead_record.oxygen:.2f} mg/L) was critically low\n"
+                    "  Possible causes: Overstocking, Stagnant water, Poor ventilation, Overfeeding"
+                )
+            elif latest_dead_record.oxygen < 1.5:
+                critical_factors.append(
+                    f"• Oxygen level ({latest_dead_record.oxygen:.2f} mg/L) was dangerously low\n"
+                    "  Possible causes: High fish density, Poor water circulation"
+                )
+
+            # Analyze pH
+            if latest_dead_record.phlevel < 4 or latest_dead_record.phlevel > 9:
+                critical_factors.append(
+                    f"• pH level ({latest_dead_record.phlevel:.2f}) was at extreme levels\n"
+                    f"  Possible causes: {self._get_ph_causes(latest_dead_record.phlevel)}"
+                )
+
+            # Analyze turbidity
+            if latest_dead_record.turbidity >= 50:
+                critical_factors.append(
+                    f"• Turbidity ({latest_dead_record.turbidity:.1f} NTU) was very high\n"
+                    "  Possible causes: Excess waste, Poor filtration, High particle content"
+                )
+
+            if not critical_factors:
+                # Check for natural causes if no water quality issues found
+                natural_causes = self._check_natural_causes(latest_dead_record)
+                if natural_causes:
+                    story.append(Paragraph(
+                        "ANALYSIS OF NON-WATER QUALITY FACTORS",
+                        heading2_style
+                    ))
+                    story.append(Spacer(1, 12))
+                    
+                    # Add warning box
+                    warning_text = (
+                        "⚠ IMPORTANT: While water parameters are normal, "
+                        "the death of a catfish indicates underlying issues that need investigation."
+                    )
+                    warning_para = Paragraph(warning_text, warning_style)
+                    story.append(warning_para)
+                    story.append(Spacer(1, 12))
+
+                    # Add detailed analysis
+                    for section in natural_causes:
+                        if section.startswith('•') or section.startswith('→'):
+                            # Indent bullet points
+                            story.append(Paragraph(f"    {section}", normal_style))
+                        elif section.startswith('\n'):
+                            # Add space before new sections
+                            story.append(Spacer(1, 8))
+                            story.append(Paragraph(section.strip(), normal_style))
+                        else:
+                            # Regular text or headers
+                            if ':' in section:
+                                # Section headers in bold
+                                story.append(Paragraph(f"<b>{section}</b>", normal_style))
+                            else:
+                                story.append(Paragraph(section, normal_style))
+                        story.append(Spacer(1, 4))
+
+                    # Add final note
+                    story.append(Spacer(1, 12))
+                    story.append(Paragraph(
+                        "<b>Note:</b> Regular monitoring and preventive measures are crucial "
+                        "even when water parameters are normal. Consider implementing a comprehensive "
+                        "health management plan for the remaining catfish.",
+                        normal_style
+                    ))
+            else:
+                for factor in critical_factors:
+                    story.append(Paragraph(factor, normal_style))
+                    story.append(Spacer(1, 8))
+
+            # Add detailed data table
+            story.append(PageBreak())
+            story.append(Paragraph("Detailed Data Log", heading2_style))
+            story.append(Spacer(1, 12))
+            
+            table = Table(data, repeatRows=1)
             table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 8),
                 ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
                 ("BACKGROUND", (0, 1), (-1, -1), colors.white),
+                ("TEXTCOLOR", (0, 1), (-1, -1), colors.black),
+                ("FONTSIZE", (0, 1), (-1, -1), 7),
                 ("GRID", (0, 0), (-1, -1), 1, colors.black),
-                ("FONTNAME", (-1, -1), (-1, -1), "Helvetica-Bold"),
             ]))
             story.append(table)
 
-            # Add analysis
-            result_paragraph = Paragraph(result_message, styles['Normal'])
-            story.append(result_paragraph)
-
-            pdf.build(story)
-            output_pdf.seek(0)
+            # Build PDF
+            doc.build(story)
+            buffer.seek(0)
 
             return send_file(
-                output_pdf,
+                buffer,
                 as_attachment=True,
-                download_name="dead-catfish-report.pdf",
+                download_name=f"dead_catfish_report_{latest_dead_record.timeData.strftime('%Y%m%d_%H%M%S')}.pdf",
                 mimetype="application/pdf"
             )
 
         except Exception as e:
-            logging.error(f"Error generating dead catfish report: {e}")
+            logging.error(f"Error generating dead catfish report: {str(e)}")
             return jsonify({"error": str(e)})
-
+    
     def _generate_analysis_message(self, record, mortality_rate):
         # Temperature analysis
         if record.temperature > 35:
@@ -326,6 +539,274 @@ class ReportService:
             return "Cloudy"
         else:
             return "Dirty"
+        
+    def _get_temperature_causes(self, temp):
+        if temp <= 20:
+            return (
+                "Cold temperature in environment, "
+                "Cold water used for replacement, "
+                "Exposure to cold wind"
+            )
+        elif 20 < temp < 26:
+            return (
+                "Below average environmental temperature, "
+                "Cooler water used during water change"
+            )
+        elif 32 <= temp < 35:
+            return (
+                "High environmental temperature, "
+                "Warm water used during water change, "
+                "Partial sun exposure"
+            )
+        elif temp >= 35:
+            return (
+                "Very high environmental temperature, "
+                "Hot water used during water change, "
+                "Direct sunlight exposure"
+            )
+        return "Temperature within normal range"
+
+    def _get_ph_causes(self, ph):
+        if ph < 4:
+            return (
+                "Strong acid contamination, "
+                "Chemical spill, "
+                "Acid rain effect"
+            )
+        elif 4 <= ph < 6:
+            return (
+                "Mild acid contamination, "
+                "Organic waste buildup, "
+                "Recent water change with acidic water"
+            )
+        elif ph > 9:
+            return (
+                "Alkaline contamination, "
+                "Cleaning products residue, "
+                "High mineral content in water source"
+            )
+        elif 7.5 < ph <= 9:
+            return (
+                "Slightly alkaline conditions, "
+                "Mineral buildup, "
+                "Recent concrete contact"
+            )
+        return "pH within normal range"
+
+    def _get_oxygen_causes(self, oxy):
+        if oxy <= 0.8:
+            return (
+                "Severe oxygen depletion, "
+                "Overcrowding, "
+                "Poor aeration, "
+                "Excess organic waste"
+            )
+        elif oxy < 1.5:
+            return (
+                "Insufficient oxygen levels, "
+                "Limited water circulation, "
+                "High fish density"
+            )
+        elif oxy > 5:
+            return (
+                "Excessive aeration, "
+                "Possible supersaturation, "
+                "Chemical interference"
+            )
+        return "Oxygen within normal range"
+
+    def _get_turbidity_causes(self, turb):
+        if turb >= 50:
+            return (
+                "High waste content, "
+                "Poor filtration, "
+                "Excess suspended particles"
+            )
+        elif 20 <= turb < 50:
+            return (
+                "Moderate particle suspension, "
+                "Partial filtration issues, "
+                "Recent water disturbance"
+            )
+        return "Turbidity within normal range"
+
+    def _analyze_parameter_trend(self, start_val, end_val, param_type):
+        """Analyzes the trend of a parameter over time."""
+        change = end_val - start_val
+        percent_change = (change / start_val * 100) if start_val != 0 else 0
+        
+        if param_type == 'temperature':
+            if abs(change) >= 5:
+                return f"Critical {param_type} change of {change:+.1f}°C ({percent_change:+.1f}%)"
+            elif abs(change) >= 2:
+                return f"Significant {param_type} change of {change:+.1f}°C ({percent_change:+.1f}%)"
+        
+        elif param_type == 'oxygen':
+            if abs(change) >= 1:
+                return f"Critical {param_type} change of {change:+.2f} mg/L ({percent_change:+.1f}%)"
+            elif abs(change) >= 0.5:
+                return f"Significant {param_type} change of {change:+.2f} mg/L ({percent_change:+.1f}%)"
+        
+        elif param_type == 'ph':
+            if abs(change) >= 1:
+                return f"Critical pH change of {change:+.2f} ({percent_change:+.1f}%)"
+            elif abs(change) >= 0.5:
+                return f"Significant pH change of {change:+.2f} ({percent_change:+.1f}%)"
+        
+        elif param_type == 'turbidity':
+            if abs(change) >= 20:
+                return f"Critical turbidity change of {change:+.1f} NTU ({percent_change:+.1f}%)"
+            elif abs(change) >= 10:
+                return f"Significant turbidity change of {change:+.1f} NTU ({percent_change:+.1f}%)"
+        
+        return f"Minor {param_type} change of {change:+.2f} ({percent_change:+.1f}%)"
+
+    def _get_stress_indicators(self, record):
+        """Identifies potential stress indicators from water parameters."""
+        indicators = []
+        
+        # Temperature stress
+        if record.temperature <= 20 or record.temperature >= 35:
+            indicators.append("Extreme temperature")
+        elif 20 < record.temperature < 26 or 32 <= record.temperature < 35:
+            indicators.append("Suboptimal temperature")
+
+        # Oxygen stress
+        if record.oxygen <= 0.8:
+            indicators.append("Critical oxygen levels")
+        elif record.oxygen < 1.5:
+            indicators.append("Low oxygen levels")
+        elif record.oxygen > 5:
+            indicators.append("Excessive oxygen")
+
+        # pH stress
+        if record.phlevel < 4 or record.phlevel > 9:
+            indicators.append("Extreme pH levels")
+        elif 4 <= record.phlevel < 6 or 7.5 < record.phlevel <= 9:
+            indicators.append("Suboptimal pH")
+
+        # Turbidity stress
+        if record.turbidity >= 50:
+            indicators.append("High turbidity")
+        elif 20 <= record.turbidity < 50:
+            indicators.append("Elevated turbidity")
+
+        return indicators
+    
+    def _check_natural_causes(self, record):
+        """
+        Detailed analysis of natural or external causes when water parameters are normal.
+        Includes specific checks and targeted recommendations.
+        """
+        # Check if all parameters are normal
+        is_temp_normal = 26 <= record.temperature <= 32
+        is_oxygen_normal = 1.5 <= record.oxygen <= 5
+        is_ph_normal = 6 <= record.phlevel <= 7.5
+        is_turbidity_normal = record.turbidity < 20
+
+        if is_temp_normal and is_oxygen_normal and is_ph_normal and is_turbidity_normal:
+            possible_causes = {
+                "Feeding Issues": {
+                    "Indicators": [
+                        "• Insufficient feeding frequency",
+                        "• Poor quality feed",
+                        "• Irregular feeding schedule",
+                        "• Competition for food among catfish"
+                    ],
+                    "Recommendations": [
+                        "→ Maintain a regular feeding schedule (2-3 times daily)",
+                        "→ Use high-quality catfish feed",
+                        "→ Monitor feeding behavior",
+                        "→ Ensure equal food distribution",
+                        "→ Consider feed supplements if needed"
+                    ]
+                },
+                "Water Level Issues": {
+                    "Indicators": [
+                        "• Insufficient water depth",
+                        "• Rapid water level changes",
+                        "• Limited swimming space",
+                        "• Stress from crowding"
+                    ],
+                    "Recommendations": [
+                        "→ Maintain proper water depth (minimum 2-3 feet)",
+                        "→ Check for leaks in the aquarium",
+                        "→ Monitor water level daily",
+                        "→ Ensure adequate space per catfish",
+                        "→ Install water level markers"
+                    ]
+                },
+                "Natural Health Issues": {
+                    "Indicators": [
+                        "• Age-related factors",
+                        "• Possible disease",
+                        "• Genetic factors",
+                        "• Stress from breeding season"
+                    ],
+                    "Recommendations": [
+                        "→ Regular health monitoring of remaining catfish",
+                        "→ Watch for unusual behavior",
+                        "→ Consider quarantine if disease is suspected",
+                        "→ Maintain detailed health records",
+                        "→ Consult a fish health specialist if needed"
+                    ]
+                },
+                "Physical Factors": {
+                    "Indicators": [
+                        "• Signs of physical injury",
+                        "• Aggressive behavior among catfish",
+                        "• Sharp objects in aquarium",
+                        "• Equipment-related injuries"
+                    ],
+                    "Recommendations": [
+                        "→ Inspect aquarium for hazardous objects",
+                        "→ Check filtration equipment for safety",
+                        "→ Monitor catfish behavior",
+                        "→ Provide adequate hiding spaces",
+                        "→ Remove any dangerous decorations"
+                    ]
+                },
+                "External Intervention": {
+                    "Indicators": [
+                        "• Unexplained deaths",
+                        "• Signs of tampering",
+                        "• Unauthorized access",
+                        "• Unusual timing of incidents"
+                    ],
+                    "Recommendations": [
+                        "→ Install security cameras if possible",
+                        "→ Restrict access to authorized personnel",
+                        "→ Maintain incident logs",
+                        "→ Implement safety protocols",
+                        "→ Regular security checks"
+                    ]
+                }
+            }
+
+            # Format for PDF report
+            report_sections = []
+            report_sections.append("All water parameters are within normal ranges.")
+            report_sections.append("Detailed Analysis of Other Possible Causes:\n")
+
+            for cause, details in possible_causes.items():
+                report_sections.append(f"\n{cause}:")
+                report_sections.append("Potential Indicators:")
+                report_sections.extend(details["Indicators"])
+                report_sections.append("\nRecommended Actions:")
+                report_sections.extend(details["Recommendations"])
+                report_sections.append("\n")
+
+            report_sections.append("\nImmediate Actions Required:")
+            report_sections.extend([
+                "1. Remove deceased catfish immediately",
+                "2. Document all observations and findings",
+                "3. Implement recommended preventive measures",
+                "4. Monitor remaining catfish closely for 48-72 hours",
+                "5. Keep detailed records of any changes or unusual behavior"
+            ])
+
+            return report_sections
+        return None
 
 
     def print_data_report(self, time_filter, date_filter):
@@ -513,7 +994,7 @@ class ReportService:
                             'parameter': "Temperature",
                             'status': "Cold Temperature",
                             'causes': [
-                                "Cold Temperature in Environment",
+                                "Cold Temperature in Environment of the Aquarium",
                                 "Cold Water was used",
                                 "Cold Wind"
                             ]

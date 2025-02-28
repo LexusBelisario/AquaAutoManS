@@ -1,14 +1,15 @@
-# app/routes/video_routes.py
 from flask import Blueprint, Response, jsonify
-import cv2
 from app.utils.limiters import limiter
 from flask_cors import CORS
+import cv2
 import logging
 import time
 from ultralytics import YOLO
 from datetime import datetime, timedelta
-from app import db
-from app.models import aquamans
+import mysql.connector
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from PIL import Image
 from io import BytesIO
 
@@ -26,18 +27,119 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# API and Database Configuration
+FLASK_API_URL = "http://127.0.0.1:5000/update_detection"
+db_config = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': '',
+    'database': 'dbserial'
+}
+
+# Configure requests with retry strategy
+session = requests.Session()
+retry_strategy = Retry(
+    total=3,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504],
+)
+adapter = HTTPAdapter(max_retries=retry_strategy)
+session.mount("http://", adapter)
+session.mount("https://", adapter)
+
 # Load YOLO model
 try:
-    model = YOLO("C:/Users/ADMIN/AquaAutoManS/machine_learning/weights/best1.pt")
+    model = YOLO("C:/Users/user/AquaAutoManS/machine_learning/weights/best1.pt")
     class_names = ["catfish", "dead_catfish"]
     logger.info("YOLO model loaded successfully")
 except Exception as e:
     logger.error(f"Failed to load YOLO model: {str(e)}")
     model = None
 
-# Initialize detection variables
-dead_catfish_detected = False
+# Global variables
+camera = None
+start_time = datetime.now()
 last_capture_time = None
+dead_catfish_detected = False
+
+def get_db_connection():
+    """Establish database connection with retry mechanism"""
+    max_retries = 3
+    retry_delay = 1  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            connection = mysql.connector.connect(**db_config)
+            return connection
+        except mysql.connector.Error as e:
+            logger.error(f"Database connection attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                logger.error("All database connection attempts failed")
+                return None
+
+def get_latest_sensor_data():
+    """Retrieve the latest sensor data from database"""
+    try:
+        connection = get_db_connection()
+        if connection is None:
+            return None
+        
+        cursor = connection.cursor(dictionary=True)
+        query = "SELECT * FROM aquamans ORDER BY id DESC LIMIT 1"
+        cursor.execute(query)
+        latest_record = cursor.fetchone()
+        cursor.close()
+        connection.close()
+        return latest_record
+    except mysql.connector.Error as e:
+        logger.error(f"Error fetching latest sensor data: {e}")
+        return None
+
+def send_detection_data(catfish_count, dead_catfish_count):
+    """Send detection data to Flask API"""
+    data = {
+        'catfish': catfish_count,
+        'dead_catfish': dead_catfish_count
+    }
+    try:
+        response = session.post(
+            FLASK_API_URL,
+            json=data,
+            headers={'Content-Type': 'application/json'},
+            timeout=5
+        )
+        response.raise_for_status()
+        logger.info(f"Data sent successfully: {response.json()}")
+        return True
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error sending data to Flask API: {e}")
+        return False
+
+def insert_data_to_db(data):
+    """Insert new data into database"""
+    try:
+        connection = get_db_connection()
+        if connection is None:
+            return
+        
+        cursor = connection.cursor()
+        query = """
+        INSERT INTO aquamans (
+            temperature, tempResult, oxygen, oxygenResult, 
+            phlevel, phResult, turbidity, turbidityResult, 
+            catfish, dead_catfish, timeData, dead_catfish_image
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, data)
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("Successfully inserted data into database")
+    except mysql.connector.Error as e:
+        logger.error(f"Error uploading data to MySQL: {e}")
 
 def init_camera():
     """Initialize and configure camera"""
@@ -47,18 +149,10 @@ def init_camera():
             logger.error("Failed to open camera")
             return None
 
-        # Set camera properties
         camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         camera.set(cv2.CAP_PROP_FPS, 30)
         
-        # Test camera
-        ret, _ = camera.read()
-        if not ret:
-            logger.error("Failed to read test frame")
-            return None
-            
-        logger.info("Camera initialized successfully")
         return camera
     except Exception as e:
         logger.error(f"Camera initialization error: {str(e)}")
@@ -70,7 +164,6 @@ def process_frame(frame):
         if model is None:
             return frame, 0, 0
 
-        # Run detection
         results = model.predict(frame, conf=0.25, iou=0.5)
         catfish_count = 0
         dead_catfish_count = 0
@@ -81,21 +174,19 @@ def process_frame(frame):
                 conf = float(box.conf[0])
                 cls = int(box.cls[0])
                 
-                # Filter out small detections
                 if (x2 - x1) < 20 or (y2 - y1) < 20:
                     continue
                 
                 label = f"{class_names[cls]} {conf:.2f}"
                 color = (0, 255, 0) if cls == 0 else (0, 0, 255)
                 
-                # Draw detection box and label
                 cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
                 cv2.putText(frame, label, (x1, y1 - 10), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
                 if cls == 0:
                     catfish_count += 1
-                else:
+                elif cls == 1:
                     dead_catfish_count += 1
 
         return frame, catfish_count, dead_catfish_count
@@ -104,56 +195,14 @@ def process_frame(frame):
         logger.error(f"Error in process_frame: {str(e)}")
         return frame, 0, 0
 
-def update_database(frame, catfish_count, dead_catfish_count):
-    """Update database with detection results"""
-    try:
-        # Get latest sensor data
-        latest_data = db.session.query(aquamans).order_by(aquamans.id.desc()).first()
-        
-        if latest_data:
-            current_time = datetime.now()
-            
-            # Convert frame to JPEG if dead catfish detected
-            img_bytes = None
-            if dead_catfish_count > 0:
-                pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                img_byte_arr = BytesIO()
-                pil_image.save(img_byte_arr, format='JPEG')
-                img_bytes = img_byte_arr.getvalue()
-
-            # Create new record
-            new_record = aquamans(
-                temperature=latest_data.temperature,
-                tempResult=latest_data.tempResult,
-                oxygen=latest_data.oxygen,
-                oxygenResult=latest_data.oxygenResult,
-                phlevel=latest_data.phlevel,
-                phResult=latest_data.phResult,
-                turbidity=latest_data.turbidity,
-                turbidityResult=latest_data.turbidityResult,
-                catfish=catfish_count,
-                dead_catfish=dead_catfish_count,
-                timeData=current_time,
-                dead_catfish_image=img_bytes
-            )
-
-            db.session.add(new_record)
-            db.session.commit()
-            logger.info(f"Database updated - Catfish: {catfish_count}, Dead: {dead_catfish_count}")
-
-    except Exception as e:
-        logger.error(f"Database update error: {str(e)}")
-        db.session.rollback()
-
 def generate_frames():
     """Generate video frames with detection"""
-    camera = init_camera()
+    global camera, start_time, last_capture_time, dead_catfish_detected
+    
     if camera is None:
-        return
-
-    start_time = datetime.now()
-    last_db_update = time.time()
-    db_update_interval = 20  # Update database every 20 seconds
+        camera = init_camera()
+        if camera is None:
+            return
 
     try:
         while True:
@@ -161,16 +210,8 @@ def generate_frames():
             elapsed_time = datetime.now() - start_time
             if elapsed_time >= timedelta(hours=1):
                 logger.info("Resting for 5 minutes to prevent overheating...")
-                camera.release()
-                time.sleep(300)  # Rest for 5 minutes
-                
-                # Reinitialize camera after rest
-                camera = init_camera()
-                if camera is None:
-                    return
-                    
+                time.sleep(300)
                 start_time = datetime.now()
-                logger.info("Resuming after rest period")
                 continue
 
             # Capture frame
@@ -183,6 +224,51 @@ def generate_frames():
             # Process frame with detection
             frame, catfish_count, dead_catfish_count = process_frame(frame)
 
+            # Send detection data to API
+            if catfish_count > 0 or dead_catfish_count > 0:
+                if send_detection_data(catfish_count, dead_catfish_count):
+                    logger.info(f"Detection data sent - Catfish: {catfish_count}, Dead: {dead_catfish_count}")
+                else:
+                    logger.warning("Failed to send detection data")
+
+            # Handle dead catfish detection
+            if dead_catfish_count > 0:
+                dead_catfish_detected = True
+                current_time = datetime.now()
+                
+                if last_capture_time is None or \
+                   (current_time - last_capture_time).total_seconds() >= 20:
+                    try:
+                        last_capture_time = current_time
+                        
+                        # Convert frame to JPEG
+                        pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                        img_byte_arr = BytesIO()
+                        pil_image.save(img_byte_arr, format='JPEG')
+                        img_byte_arr = img_byte_arr.getvalue()
+
+                        # Get and update sensor data
+                        latest_data = get_latest_sensor_data()
+                        if latest_data:
+                            data_to_insert = (
+                                latest_data["temperature"],
+                                latest_data["tempResult"],
+                                latest_data["oxygen"],
+                                latest_data["oxygenResult"],
+                                latest_data["phlevel"],
+                                latest_data["phResult"],
+                                latest_data["turbidity"],
+                                latest_data["turbidityResult"],
+                                catfish_count,
+                                dead_catfish_count,
+                                current_time,
+                                img_byte_arr
+                            )
+                            insert_data_to_db(data_to_insert)
+                            logger.info("Database updated with new detection data")
+                    except Exception as e:
+                        logger.error(f"Error handling dead catfish detection: {e}")
+
             # Add timestamp and counts to frame
             cv2.putText(frame, f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
@@ -191,14 +277,8 @@ def generate_frames():
             cv2.putText(frame, f"Dead Catfish: {dead_catfish_count}", 
                        (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
-            # Update database periodically
-            current_time = time.time()
-            if current_time - last_db_update >= db_update_interval:
-                update_database(frame, catfish_count, dead_catfish_count)
-                last_db_update = current_time
-
             # Encode and yield frame
-            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            ret, buffer = cv2.imencode('.jpg', frame)
             if not ret:
                 continue
 
@@ -235,13 +315,31 @@ def video_feed():
 def detection_status():
     """Get current detection status"""
     try:
-        latest_record = db.session.query(aquamans).order_by(aquamans.id.desc()).first()
+        latest_record = get_latest_sensor_data()
         return jsonify({
             'status': 'success',
-            'catfish_count': latest_record.catfish if latest_record else 0,
-            'dead_catfish_count': latest_record.dead_catfish if latest_record else 0,
-            'last_update': latest_record.timeData.isoformat() if latest_record else None
+            'catfish_count': latest_record["catfish"] if latest_record else 0,
+            'dead_catfish_count': latest_record["dead_catfish"] if latest_record else 0,
+            'last_update': latest_record["timeData"].isoformat() if latest_record else None
         })
     except Exception as e:
         logger.error(f"Error getting detection status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    
+@video_bp.route('/system_status')
+def system_status():
+    """Get system rest status"""
+    try:
+        global start_time
+        elapsed_time = datetime.now() - start_time
+        is_resting = elapsed_time >= timedelta(hours=1)
+        
+        return jsonify({
+            'status': 'success',
+            'is_resting': is_resting,
+            'message': "System is resting for 5 minutes to prevent overheating" if is_resting else "System is active",
+            'next_rest': (timedelta(hours=1) - elapsed_time).total_seconds() if not is_resting else 300  # Time until next rest or remaining rest time
+        })
+    except Exception as e:
+        logger.error(f"Error getting system status: {str(e)}")
         return jsonify({'error': str(e)}), 500
