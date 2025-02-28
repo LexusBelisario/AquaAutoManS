@@ -8,67 +8,173 @@ import base64
 import logging
 from io import BytesIO
 from PIL import Image
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 
 class DataService:
-    def get_data(self, date_filter, page=1, per_page=10):
+    def print_data_report(self, time_filter, date_filter):
         try:
-            page = int(page)
-            per_page = int(per_page)
-            
-            offset = (page - 1) * per_page
-
-            with db.engine.connect() as connection:
-                base_query = "FROM aquamans"
-                where_clause = ""
-                params = {'limit': per_page, 'offset': offset}
-
+            if time_filter > 0:
                 if date_filter:
-                    try:
-                        filter_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
-                        where_clause = "WHERE DATE(timeData) = :filter_date"
-                        params['filter_date'] = filter_date
-                    except ValueError:
-                        return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
+                    filter_date = datetime.strptime(date_filter, "%Y-%m-%d")
+                    if filter_date.date() != datetime.today().date():
+                        return jsonify({"message": "3 hours report only works with today's date."}), 400
+                else:
+                    filter_date = datetime.now()
+            else:
+                if date_filter:
+                    filter_date = datetime.strptime(date_filter, "%Y-%m-%d")
+                else:
+                    filter_date = datetime.now()
 
-                # Count total records
-                count_query = f"SELECT COUNT(*) {base_query} {where_clause}"
-                total = connection.execute(text(count_query), params).scalar()
+            if time_filter > 0:
+                start_time = filter_date - timedelta(hours=time_filter)
+            else:
+                start_time = filter_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            end_time = filter_date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-                # Get paginated data
-                data_query = f"""
-                    SELECT *
-                    {base_query}
-                    {where_clause}
-                    ORDER BY timeData DESC
-                    LIMIT :limit OFFSET :offset
-                """
+            # Optimize query to select only needed columns
+            recent_data = (
+                aquamans.query
+                .with_entities(
+                    aquamans.timeData,
+                    aquamans.temperature,
+                    aquamans.tempResult,
+                    aquamans.oxygen,
+                    aquamans.oxygenResult,
+                    aquamans.phlevel,
+                    aquamans.phResult,
+                    aquamans.turbidity,
+                    aquamans.turbidityResult,
+                    aquamans.catfish,
+                    aquamans.dead_catfish
+                )
+                .filter(
+                    aquamans.timeData.between(start_time, end_time)
+                )
+                .order_by(aquamans.timeData)
+                .all()
+            )
+
+            if not recent_data:
+                return jsonify({"message": "No records found in the selected time range."})
+
+            # Calculate totals while processing data
+            totals = {
+                'temperature': 0,
+                'oxygen': 0,
+                'phlevel': 0,
+                'turbidity': 0,
+                'count': 0
+            }
+
+            # Prepare data for PDF
+            data = [["Time", "Temperature", "Result", "Oxygen", "Result", 
+                    "pH Level", "Result", "Turbidity", "Result", 
+                    "Alive Catfish", "Dead Catfish"]]
+
+            for record in recent_data:
+                data.append([
+                    record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
+                    f"{record.temperature:.2f}",
+                    record.tempResult,
+                    f"{record.oxygen:.2f}",
+                    record.oxygenResult,
+                    f"{record.phlevel:.2f}",
+                    record.phResult,
+                    f"{record.turbidity:.2f}",
+                    record.turbidityResult,
+                    str(record.catfish),
+                    str(record.dead_catfish)
+                ])
                 
-                result = connection.execute(text(data_query), params)
-                
-                # Convert rows to dictionaries
-                records = []
-                for row in result:
-                    record = dict(zip(result.keys(), row))
-                    # Handle any binary data conversion if needed
-                    for key, value in record.items():
-                        if isinstance(value, bytes):
-                            record[key] = base64.b64encode(value).decode('utf-8')
-                        elif isinstance(value, datetime):
-                            record[key] = value.isoformat()
-                    records.append(record)
+                # Update totals
+                totals['temperature'] += float(record.temperature or 0)
+                totals['oxygen'] += float(record.oxygen or 0)
+                totals['phlevel'] += float(record.phlevel or 0)
+                totals['turbidity'] += float(record.turbidity or 0)
+                totals['count'] += 1
 
-                # Return paginated response
-                return jsonify({
-                    'data': records,
-                    'total': total,
-                    'page': page,
-                    'per_page': per_page,
-                    'total_pages': (total + per_page - 1) // per_page
-                })
+            # Create PDF
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=letter,
+                rightMargin=72,
+                leftMargin=72,
+                topMargin=72,
+                bottomMargin=72
+            )
+
+            # Define styles
+            styles = getSampleStyleSheet()
+            title_style = styles["Heading1"]
+            normal_style = styles["Normal"]
+
+            # Create story for PDF
+            story = []
+
+            # Add title
+            title = "Catfish Data Report"
+            story.append(Paragraph(title, title_style))
+            story.append(Spacer(1, 12))
+
+            # Create table
+            table = Table(data, repeatRows=1)
+            table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.white),
+                ("TEXTCOLOR", (0, 1), (-1, -1), colors.black),
+                ("FONTSIZE", (0, 1), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+            ]))
+            story.append(table)
+
+            # Add summary statistics
+            if totals['count'] > 0:
+                story.append(Spacer(1, 20))
+                story.append(Paragraph("Summary Statistics", styles["Heading2"]))
+                summary_data = [
+                    ["Metric", "Average Value"],
+                    ["Temperature", f"{totals['temperature']/totals['count']:.2f}°C"],
+                    ["Oxygen", f"{totals['oxygen']/totals['count']:.2f} mg/L"],
+                    ["pH Level", f"{totals['phlevel']/totals['count']:.2f}"],
+                    ["Turbidity", f"{totals['turbidity']/totals['count']:.2f} NTU"]
+                ]
+                summary_table = Table(summary_data)
+                summary_table.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                ]))
+                story.append(summary_table)
+
+            # Build PDF
+            doc.build(story)
+            buffer.seek(0)
+
+            return send_file(
+                buffer,
+                as_attachment=True,
+                download_name=f"aquamans_report_{filter_date.strftime('%Y%m%d')}.pdf",
+                mimetype="application/pdf"
+            )
 
         except Exception as e:
-            logging.error(f"Error in get_data: {str(e)}")
-            return jsonify({'error': str(e)}), 500
+            logging.error(f"Error generating report: {str(e)}")
+            return jsonify({"message": "An error occurred while generating the report."}), 500
 
     def get_temperature_data(self):
         try:
