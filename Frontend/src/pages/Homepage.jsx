@@ -17,9 +17,11 @@ import { LineGraphTurb } from "../graphs/lineGraphTurb";
 import axios from "axios";
 import LiveVideoFeed from "./LiveVideoFeed";
 import WaterQualityAlertBox from "../components/WaterQualityAlertBox";
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import ErrorBoundary from "../components/ErrorBoundary";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import ErrorBoundary from "../components/errorBoundary";
+
+const API_URL = "http://localhost:5000/api/water-quality";
 
 export default function Homepage({ setAuth }) {
   const [deadCatfishAlerts, setDeadCatfishAlerts] = useState([]);
@@ -29,7 +31,7 @@ export default function Homepage({ setAuth }) {
 
   // Notification function
   const notifyWaterQualityIssue = (alert) => {
-    const priority = alert.details.priority_level;
+    const priority = determineAlertPriority(alert);
     const toastOptions = {
       position: "top-right",
       autoClose: 5000,
@@ -40,44 +42,110 @@ export default function Homepage({ setAuth }) {
     };
 
     switch (priority) {
-      case 'Critical':
-        toast.error(`Critical Alert: Water quality issues detected!`, toastOptions);
+      case "Critical":
+        toast.error(`Critical Alert: ${getAlertMessage(alert)}`, toastOptions);
         break;
-      case 'Warning':
-        toast.warning(`Warning: Water parameters need attention`, toastOptions);
+      case "Warning":
+        toast.warning(`Warning: ${getAlertMessage(alert)}`, toastOptions);
         break;
       default:
         toast.info(`Water quality update`, toastOptions);
     }
   };
 
+  const determineAlertPriority = (data) => {
+    if (
+      data.tempResult === "Critical" ||
+      data.oxygenResult === "Critical" ||
+      data.phResult === "Critical" ||
+      data.turbidityResult === "Critical"
+    ) {
+      return "Critical";
+    }
+    if (
+      data.tempResult === "Warning" ||
+      data.oxygenResult === "Warning" ||
+      data.phResult === "Warning" ||
+      data.turbidityResult === "Warning"
+    ) {
+      return "Warning";
+    }
+    return "Normal";
+  };
+
+  const getAlertMessage = (data) => {
+    const issues = [];
+    if (data.tempResult !== "Normal")
+      issues.push(`Temperature is ${data.tempResult.toLowerCase()}`);
+    if (data.oxygenResult !== "Normal")
+      issues.push(`Oxygen is ${data.oxygenResult.toLowerCase()}`);
+    if (data.phResult !== "Normal")
+      issues.push(`pH is ${data.phResult.toLowerCase()}`);
+    if (data.turbidityResult !== "Normal")
+      issues.push(`Turbidity is ${data.turbidityResult.toLowerCase()}`);
+    return issues.join(", ") || "All parameters need attention";
+  };
+
   // Fetch water quality data
   useEffect(() => {
     const fetchWaterQuality = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/check_water_quality");
-        console.log("Water quality response:", response.data);
+        const response = await axios.get(`${API_URL}/check`);
+        console.log("Raw API response:", response.data);
 
-        if (response.data && response.data.details) {
-          // Check if any parameters are outside normal ranges
-          const hasIssues = !response.data.details.all_parameters_normal;
-          
-          if (hasIssues) {
-            // Notify user of issues
+        if (response.data && response.data.alert_id) {
+          const formattedAlert = {
+            alert: "Water Quality Status Update",
+            details: {
+              alert_id: response.data.alert_id,
+              time_detected: response.data.time_detected,
+              priority_level: determineAlertPriority(response.data),
+
+              temperature: response.data.temperature,
+              temperature_status: response.data.tempResult,
+              temperature_trend: response.data.temperature_trend,
+              temperature_history: response.data.historical_data.temperature,
+
+              oxygen: response.data.oxygen,
+              oxygen_status: response.data.oxygenResult,
+              oxygen_trend: response.data.oxygen_trend,
+              oxygen_history: response.data.historical_data.oxygen,
+
+              phlevel: response.data.phlevel,
+              phlevel_status: response.data.phResult,
+              ph_trend: response.data.ph_trend,
+              ph_history: response.data.historical_data.ph,
+
+              turbidity: response.data.turbidity,
+              turbidity_status: response.data.turbidityResult,
+              turbidity_trend: response.data.turbidity_trend,
+              turbidity_history: response.data.historical_data.turbidity,
+
+              detected_issues: [getAlertMessage(response.data)],
+              recommendations: generateRecommendations(response.data),
+            },
+          };
+
+          console.log("Formatted alert:", formattedAlert);
+
+          setWaterQualityAlerts((prevAlerts) => {
+            const newAlerts = [...prevAlerts];
+            const existingAlertIndex = newAlerts.findIndex(
+              (alert) =>
+                alert.details.alert_id === formattedAlert.details.alert_id
+            );
+
+            if (existingAlertIndex === -1) {
+              newAlerts.unshift(formattedAlert);
+            } else {
+              newAlerts[existingAlertIndex] = formattedAlert;
+            }
+
+            return newAlerts.slice(0, 5); // Keep only last 5 alerts
+          });
+
+          if (formattedAlert.details.priority_level !== "Normal") {
             notifyWaterQualityIssue(response.data);
-            
-            setWaterQualityAlerts(prevAlerts => {
-              // Check if this alert already exists
-              const alertExists = prevAlerts.some(
-                alert => alert.details.alert_id === response.data.details.alert_id
-              );
-              
-              if (!alertExists) {
-                // Add new alert to the beginning of the array
-                return [response.data, ...prevAlerts];
-              }
-              return prevAlerts;
-            });
           }
         }
       } catch (error) {
@@ -98,7 +166,9 @@ export default function Homepage({ setAuth }) {
   useEffect(() => {
     const fetchDeadCatfish = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/check_dead_catfish");
+        const response = await axios.get(
+          "http://localhost:5000/check_dead_catfish"
+        );
         if (response.data.alert) {
           setDeadCatfishAlerts((prevAlerts) => {
             const newAlert = {
@@ -123,13 +193,13 @@ export default function Homepage({ setAuth }) {
   }, []);
 
   const removeWaterQualityAlert = (alertId) => {
-    setWaterQualityAlerts(prevAlerts => 
-      prevAlerts.filter(alert => alert.details.alert_id !== alertId)
+    setWaterQualityAlerts((prevAlerts) =>
+      prevAlerts.filter((alert) => alert.details.alert_id !== alertId)
     );
   };
 
   const removeDeadCatfishAlert = (index) => {
-    setDeadCatfishAlerts((prevAlerts) => 
+    setDeadCatfishAlerts((prevAlerts) =>
       prevAlerts.filter((_, i) => i !== index)
     );
   };
@@ -137,10 +207,20 @@ export default function Homepage({ setAuth }) {
   return (
     <div className="min-h-screen bg-[#F0F8FF] overflow-hidden">
       <ToastContainer />
-      
-      {/* Navbar */}
+
+      {/* Navbar with Notifications */}
       <div className="fixed top-0 left-0 right-0 z-50">
-        <Navbar />
+        <div className="flex justify-between items-center bg-white shadow">
+          <Navbar />
+          <div className="mr-4">
+            <ErrorBoundary>
+              <WaterQualityAlertBox
+                alerts={waterQualityAlerts}
+                removeAlert={removeWaterQualityAlert}
+              />
+            </ErrorBoundary>
+          </div>
+        </div>
       </div>
 
       {/* Main content container */}
@@ -176,15 +256,9 @@ export default function Homepage({ setAuth }) {
           {/* Alert Box */}
           <div>
             <p className="text-2xl font-bold mb-4">Alert Notifications</p>
-            <ErrorBoundary>
-              <WaterQualityAlertBox 
-                alerts={waterQualityAlerts} 
-                removeAlert={removeWaterQualityAlert}
-              />
-            </ErrorBoundary>
-            <AlertBox 
-              alerts={deadCatfishAlerts} 
-              removeAlert={removeDeadCatfishAlert} 
+            <AlertBox
+              alerts={deadCatfishAlerts}
+              removeAlert={removeDeadCatfishAlert}
             />
             <p className="text-2xl font-bold my-4">Image Notifications</p>
             <PictureBox />
@@ -212,4 +286,38 @@ export default function Homepage({ setAuth }) {
       </div>
     </div>
   );
+}
+
+function generateRecommendations(data) {
+  const recommendations = [];
+
+  if (data.tempResult !== "Normal") {
+    recommendations.push(
+      data.temperature > 32
+        ? "Activate cooling system and increase water circulation"
+        : "Check heater functionality and monitor water temperature"
+    );
+  }
+
+  if (data.oxygenResult !== "Normal") {
+    recommendations.push(
+      data.oxygen < 5
+        ? "Increase aeration and check oxygen supply system"
+        : "Monitor oxygen levels and adjust aeration accordingly"
+    );
+  }
+
+  if (data.phResult !== "Normal") {
+    recommendations.push(
+      "Check pH levels and adjust water chemistry as needed"
+    );
+  }
+
+  if (data.turbidityResult !== "Normal") {
+    recommendations.push(
+      "Check filtration system and consider partial water change"
+    );
+  }
+
+  return recommendations;
 }

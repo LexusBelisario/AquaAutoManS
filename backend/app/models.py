@@ -4,6 +4,7 @@ from app import db
 from datetime import datetime
 from sqlalchemy import Index, event
 from sqlalchemy.orm import relationship
+from app.extensions import db
 
 class aquamans(db.Model):
     id = db.Column(db.Integer, primary_key=True)

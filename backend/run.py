@@ -12,7 +12,7 @@ import time
 
 logging.basicConfig(level=logging.DEBUG)
 
-app = create_app()
+app = create_app('development')
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 ErrorHandler.init_app(app)

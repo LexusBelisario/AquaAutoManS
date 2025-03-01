@@ -10,7 +10,7 @@ except MySQLdb.Error as err:
     print(f"Could not connect to database: {err}")
     sys.exit(1)
 
-device = 'COM13' 
+device = 'COM3' 
 
 try:
     print("Trying...", device)
