@@ -17,6 +17,8 @@ import { LineGraphTurb } from "../graphs/lineGraphTurb";
 import axios from "axios";
 import LiveVideoFeed from "./LiveVideoFeed";
 import WaterQualityAlertBox from "../components/WaterQualityAlertBox";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import ErrorBoundary from "../components/ErrorBoundary";
 
 export default function Homepage({ setAuth }) {
@@ -25,15 +27,58 @@ export default function Homepage({ setAuth }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Notification function
+  const notifyWaterQualityIssue = (alert) => {
+    const priority = alert.details.priority_level;
+    const toastOptions = {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    };
+
+    switch (priority) {
+      case 'Critical':
+        toast.error(`Critical Alert: Water quality issues detected!`, toastOptions);
+        break;
+      case 'Warning':
+        toast.warning(`Warning: Water parameters need attention`, toastOptions);
+        break;
+      default:
+        toast.info(`Water quality update`, toastOptions);
+    }
+  };
+
   // Fetch water quality data
   useEffect(() => {
     const fetchWaterQuality = async () => {
       try {
-        const response = await axios.get(
-          "http://localhost:5000/check_water_quality"
-        );
-        if (response.data) {
-          setWaterQualityAlerts([response.data]);
+        const response = await axios.get("http://localhost:5000/check_water_quality");
+        console.log("Water quality response:", response.data);
+
+        if (response.data && response.data.details) {
+          // Check if any parameters are outside normal ranges
+          const hasIssues = !response.data.details.all_parameters_normal;
+          
+          if (hasIssues) {
+            // Notify user of issues
+            notifyWaterQualityIssue(response.data);
+            
+            setWaterQualityAlerts(prevAlerts => {
+              // Check if this alert already exists
+              const alertExists = prevAlerts.some(
+                alert => alert.details.alert_id === response.data.details.alert_id
+              );
+              
+              if (!alertExists) {
+                // Add new alert to the beginning of the array
+                return [response.data, ...prevAlerts];
+              }
+              return prevAlerts;
+            });
+          }
         }
       } catch (error) {
         console.error("Error fetching water quality data:", error);
@@ -53,9 +98,7 @@ export default function Homepage({ setAuth }) {
   useEffect(() => {
     const fetchDeadCatfish = async () => {
       try {
-        const response = await axios.get(
-          "http://localhost:5000/check_dead_catfish"
-        );
+        const response = await axios.get("http://localhost:5000/check_dead_catfish");
         if (response.data.alert) {
           setDeadCatfishAlerts((prevAlerts) => {
             const newAlert = {
@@ -80,19 +123,21 @@ export default function Homepage({ setAuth }) {
   }, []);
 
   const removeWaterQualityAlert = (alertId) => {
-    setWaterQualityAlerts((prevAlerts) =>
-      prevAlerts.filter((alert) => alert.details.alert_id !== alertId)
+    setWaterQualityAlerts(prevAlerts => 
+      prevAlerts.filter(alert => alert.details.alert_id !== alertId)
     );
   };
 
   const removeDeadCatfishAlert = (index) => {
-    setDeadCatfishAlerts((prevAlerts) =>
+    setDeadCatfishAlerts((prevAlerts) => 
       prevAlerts.filter((_, i) => i !== index)
     );
   };
 
   return (
     <div className="min-h-screen bg-[#F0F8FF] overflow-hidden">
+      <ToastContainer />
+      
       {/* Navbar */}
       <div className="fixed top-0 left-0 right-0 z-50">
         <Navbar />
@@ -132,14 +177,14 @@ export default function Homepage({ setAuth }) {
           <div>
             <p className="text-2xl font-bold mb-4">Alert Notifications</p>
             <ErrorBoundary>
-              <WaterQualityAlertBox
-                alerts={waterQualityAlerts}
+              <WaterQualityAlertBox 
+                alerts={waterQualityAlerts} 
                 removeAlert={removeWaterQualityAlert}
               />
             </ErrorBoundary>
-            <AlertBox
-              alerts={deadCatfishAlerts}
-              removeAlert={removeDeadCatfishAlert}
+            <AlertBox 
+              alerts={deadCatfishAlerts} 
+              removeAlert={removeDeadCatfishAlert} 
             />
             <p className="text-2xl font-bold my-4">Image Notifications</p>
             <PictureBox />
