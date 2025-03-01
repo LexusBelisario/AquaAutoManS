@@ -49,7 +49,7 @@ session.mount("https://", adapter)
 
 # Load YOLO model
 try:
-    model = YOLO("C:/Users/user/AquaAutoManS/machine_learning/weights/best1.pt")
+    model = YOLO("C:/Users/ADMIN/AquaAutoManS/machine_learning/weights/best1.pt")
     class_names = ["catfish", "dead_catfish"]
     logger.info("YOLO model loaded successfully")
 except Exception as e:

@@ -19,7 +19,7 @@ import LiveVideoFeed from "./LiveVideoFeed";
 import WaterQualityAlertBox from "../components/WaterQualityAlertBox";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import ErrorBoundary from "../components/errorBoundary";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 const API_URL = "http://localhost:5000/api/water-quality";
 
