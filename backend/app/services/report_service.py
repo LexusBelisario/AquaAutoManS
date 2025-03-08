@@ -1196,3 +1196,6 @@ class ReportService:
         except Exception as e:
             logging.error(f"Error generating report: {str(e)}")
             return jsonify({"message": "An error occurred while generating the report."}), 500
+
+        # checkout
+        
