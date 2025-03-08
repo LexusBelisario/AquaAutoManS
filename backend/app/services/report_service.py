@@ -271,9 +271,9 @@ class ReportService:
                 ["Time of Death", "Total Catfish", "Dead Catfish", "Mortality Rate"],
                 [
                     latest_dead_record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
-                    str(int(total_catfish)),
-                    str(int(totals['dead_catfish'])),
-                    f"{mortality_rate:.2f}%"
+                    str(int(totals['alive_catfish'] / totals['count'])),
+                    str(int(latest_dead_record.dead_catfish)), 
+                    f"{(latest_dead_record.dead_catfish / (latest_dead_record.catfish + latest_dead_record.dead_catfish) * 100):.2f}%"
                 ]
             ]
             summary_table = Table(incident_summary)
@@ -432,7 +432,7 @@ class ReportService:
             return send_file(
                 buffer,
                 as_attachment=True,
-                download_name=f"dead_catfish_report_{latest_dead_record.timeData.strftime('%Y%m%d_%H%M%S')}.pdf",
+                download_name=f"dead-catfish-report-{latest_dead_record.timeData.strftime('%B-%d-%Y').lower()}.pdf",
                 mimetype="application/pdf"
             )
 
