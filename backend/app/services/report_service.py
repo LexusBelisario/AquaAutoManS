@@ -848,6 +848,171 @@ class ReportService:
                 return jsonify({"message": "No records found in the selected time range."})
 
             logging.info(f"Found {len(recent_data)} records")
+            
+            def classify_case(data):
+                fluctuations = {
+                    'temperature': [],
+                    'oxygen': [],
+                    'phlevel': [],
+                    'turbidity': []
+                }
+                
+                for i in range(1, len(data)):
+                    prev_record = data[i-1]
+                    curr_record = data[i]
+                    
+                    # Temperature fluctuation
+                    temp = curr_record.temperature
+                    if temp <= 20:
+                        fluctuations['temperature'].append({
+                            'time': curr_record.timeData,
+                            'change': abs(curr_record.temperature - prev_record.temperature),
+                            'prev_value': prev_record.temperature,
+                            'curr_value': curr_record.temperature,
+                            'status': "Cold Temperature"
+                        })
+                    elif 20 < temp < 26:
+                        fluctuations['temperature'].append({
+                            'time': curr_record.timeData,
+                            'change': abs(curr_record.temperature - prev_record.temperature),
+                            'prev_value': prev_record.temperature,
+                            'curr_value': curr_record.temperature,
+                            'status': "Below Average Temperature"
+                        })
+                    elif 32 <= temp < 35:
+                        fluctuations['temperature'].append({
+                            'time': curr_record.timeData,
+                            'change': abs(curr_record.temperature - prev_record.temperature),
+                            'prev_value': prev_record.temperature,
+                            'curr_value': curr_record.temperature,
+                            'status': "Above Average Temperature"
+                        })
+                    elif temp >= 35:
+                        fluctuations['temperature'].append({
+                            'time': curr_record.timeData,
+                            'change': abs(curr_record.temperature - prev_record.temperature),
+                            'prev_value': prev_record.temperature,
+                            'curr_value': curr_record.temperature,
+                            'status': "Hot Temperature"
+                        })
+                    
+                    # Oxygen fluctuation
+                    oxy = curr_record.oxygen
+                    if oxy <= 0.8:
+                        fluctuations['oxygen'].append({
+                            'time': curr_record.timeData,
+                            'change': abs(curr_record.oxygen - prev_record.oxygen),
+                            'prev_value': prev_record.oxygen,
+                            'curr_value': curr_record.oxygen,
+                            'status': "Very Low Oxygen"
+                        })
+                    elif oxy < 1.5:
+                        fluctuations['oxygen'].append({
+                            'time': curr_record.timeData,
+                            'change': abs(curr_record.oxygen - prev_record.oxygen),
+                            'prev_value': prev_record.oxygen,
+                            'curr_value': curr_record.oxygen,
+                            'status': "Low Oxygen"
+                        })
+                    elif oxy > 5:
+                        fluctuations['oxygen'].append({
+                            'time': curr_record.timeData,
+                            'change': abs(curr_record.oxygen - prev_record.oxygen),
+                            'prev_value': prev_record.oxygen,
+                            'curr_value': curr_record.oxygen,
+                            'status': "High Oxygen"
+                        })
+                    
+                    # pH fluctuation
+                    ph = curr_record.phlevel
+                    if ph < 4:
+                        fluctuations['phlevel'].append({
+                            'time': curr_record.timeData,
+                            'change': abs(curr_record.phlevel - prev_record.phlevel),
+                            'prev_value': prev_record.phlevel,
+                            'curr_value': curr_record.phlevel,
+                            'status': "Very Acidic"
+                        })
+                    elif 4 <= ph < 6:
+                        fluctuations['phlevel'].append({
+                            'time': curr_record.timeData,
+                            'change': abs(curr_record.phlevel - prev_record.phlevel),
+                            'prev_value': prev_record.phlevel,
+                            'curr_value': curr_record.phlevel,
+                            'status': "Acidic"
+                        })
+                    elif ph > 9:
+                        fluctuations['phlevel'].append({
+                            'time': curr_record.timeData,
+                            'change': abs(curr_record.phlevel - prev_record.phlevel),
+                            'prev_value': prev_record.phlevel,
+                            'curr_value': curr_record.phlevel,
+                            'status': "Very Alkaline"
+                        })
+                    
+                    # Turbidity fluctuation
+                    turb = curr_record.turbidity
+                    if turb >= 50:
+                        fluctuations['turbidity'].append({
+                            'time': curr_record.timeData,
+                            'change': abs(curr_record.turbidity - prev_record.turbidity),
+                            'prev_value': prev_record.turbidity,
+                            'curr_value': curr_record.turbidity,
+                            'status': "Dirty"
+                        })
+                    elif 20 <= turb < 50:
+                        fluctuations['turbidity'].append({
+                            'time': curr_record.timeData,
+                            'change': abs(curr_record.turbidity - prev_record.turbidity),
+                            'prev_value': prev_record.turbidity,
+                            'curr_value': curr_record.turbidity,
+                            'status': "Cloudy"
+                        })
+                
+                # Determine case based on fluctuations
+                total_abnormal_params = sum(
+                    1 for param_fluc in fluctuations.values() if param_fluc
+                )
+                
+                # Check for fish mortality
+                dead_fish = any(record.dead_catfish > 0 for record in data)
+                
+                if dead_fish:
+                    return {
+                        'case': "Case 5: A Fish Died",
+                        'case_description': "Fish mortality detected during the monitoring period.",
+                        'fluctuations': fluctuations
+                    }
+                
+                if total_abnormal_params == 0:
+                    return {
+                        'case': "Case 1: Normal Readings",
+                        'case_description': "All water parameters remained stable during the monitored period.",
+                        'fluctuations': fluctuations
+                    }
+                elif total_abnormal_params == 1:
+                    abnormal_param = next(
+                        param for param, fluc in fluctuations.items() if fluc
+                    )
+                    return {
+                        'case': "Case 2: 1 Minor Fluctuation",
+                        'case_description': f"Detected a minor fluctuation in {abnormal_param}",
+                        'fluctuations': fluctuations
+                    }
+                elif total_abnormal_params == 2:
+                    return {
+                        'case': "Case 3: 2 or More Minor Fluctuations",
+                        'case_description': "Multiple minor fluctuations detected across different water parameters.",
+                        'fluctuations': fluctuations
+                    }
+                else:
+                    return {
+                        'case': "Case 4: 1 or More Major Fluctuations",
+                        'case_description': "Significant variations observed in multiple water parameters.",
+                        'fluctuations': fluctuations
+                    }
+            # Classify the case
+            case_classification = classify_case(recent_data)
 
             # Prepare data for PDF
             data = [["Time", "Temperature", "Result", "Oxygen", "Result", 
@@ -1180,6 +1345,23 @@ class ReportService:
                     "No critical incidents detected during this period. All parameters were within normal ranges.",
                     normal_style
                 ))
+                
+            story.insert(1, Paragraph(f"Case: {case_classification['case']}", normal_style))
+            story.insert(2, Paragraph(f"Case Description: {case_classification['case_description']}", normal_style))
+            story.insert(3, Spacer(1, 12))
+
+        # Add fluctuations section if applicable
+            if case_classification['case'] != "Case 1: Normal Readings":
+                story.insert(4, Paragraph("Fluctuations Detected:", heading2_style))
+                for param, fluc_list in case_classification['fluctuations'].items():
+                    if fluc_list:
+                        story.insert(5, Paragraph(f"{param.capitalize()} Fluctuations:", normal_style))
+                        for fluc in fluc_list:
+                            story.insert(6, Paragraph(
+                                f"Time: {fluc['time'].strftime('%Y-%m-%d %H:%M:%S')}, Change: {fluc['change']:.2f}", 
+                                normal_style
+                            ))
+                story.insert(7, Spacer(1, 12))
 
             logging.info("Building PDF")
             doc.build(story)
