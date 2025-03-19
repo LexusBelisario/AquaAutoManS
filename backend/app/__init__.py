@@ -33,13 +33,14 @@ def create_app(config_name='development'):
 
     # Register blueprints
     with app.app_context():
-        from app.routes import sensor_routes, data_routes, report_routes, video_routes
+        from app.routes import sensor_routes, data_routes, report_routes
+        # , video_routes
         from app.routes.water_quality_routes import bp as water_quality_bp
         
         app.register_blueprint(sensor_routes.bp)
         app.register_blueprint(data_routes.bp)
         app.register_blueprint(report_routes.bp)
-        app.register_blueprint(video_routes.video_bp, url_prefix='/video')
+        # app.register_blueprint(video_routes.video_bp, url_prefix='/video')
         app.register_blueprint(water_quality_bp)
 
     # Error handlers

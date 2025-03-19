@@ -6,8 +6,9 @@ import logging
 from io import BytesIO
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image
 from reportlab.lib import colors
+from reportlab.lib.units import inch
 
 class ReportService:
     def check_dead_catfish(self):
@@ -142,7 +143,9 @@ class ReportService:
             logging.error(f"Error checking for dead catfish: {e}")
             return jsonify({'error': str(e)})
 
+
     def print_dead_catfish_report(self, alert_id):
+        """Generate a detailed report for dead catfish incidents"""
         try:
             logging.info(f"Starting dead catfish report generation for alert ID: {alert_id}")
             
@@ -156,17 +159,16 @@ class ReportService:
             if not latest_dead_record:
                 return jsonify({"message": "No dead catfish detected in the system."})
 
-            # Get data from 3 hours before the incident
-            three_hours_ago = latest_dead_record.timeData - timedelta(hours=3)
+            # Get the previous 1800 records including the time of death
             recent_data = (
-                aquamans.query.filter(
-                    aquamans.timeData.between(three_hours_ago, latest_dead_record.timeData)
-                )
-                .order_by(aquamans.timeData)
+                aquamans.query.filter(aquamans.timeData <= latest_dead_record.timeData)
+                .order_by(aquamans.timeData.desc())
+                .limit(1800)
                 .all()
             )
+            recent_data.reverse()  # Reverse to maintain chronological order
 
-            logging.info(f"Found {len(recent_data)} records in the 3-hour window")
+            logging.info(f"Found {len(recent_data)} records in the data log")
 
             # Initialize totals for analysis
             totals = {
@@ -178,41 +180,6 @@ class ReportService:
                 'alive_catfish': 0,
                 'dead_catfish': 0
             }
-
-            # Prepare data table
-            data = [["Time", "Temperature (°C)", "Result", "Oxygen (mg/L)", "Result", 
-                    "pH Level", "Result", "Turbidity (NTU)", "Result", 
-                    "Alive Catfish", "Dead Catfish"]]
-
-            # Process data
-            for record in recent_data:
-                time_str = record.timeData.strftime("%Y-%m-%d %H:%M:%S")
-                data.append([
-                    time_str,
-                    f"{record.temperature:.2f}",
-                    record.tempResult,
-                    f"{record.oxygen:.2f}",
-                    record.oxygenResult,
-                    f"{record.phlevel:.2f}",
-                    record.phResult,
-                    f"{record.turbidity:.2f}",
-                    record.turbidityResult,
-                    str(record.catfish),
-                    str(record.dead_catfish)
-                ])
-
-                # Update totals
-                totals['temperature'] += float(record.temperature or 0)
-                totals['oxygen'] += float(record.oxygen or 0)
-                totals['phlevel'] += float(record.phlevel or 0)
-                totals['turbidity'] += float(record.turbidity or 0)
-                totals['alive_catfish'] += float(record.catfish or 0)
-                totals['dead_catfish'] += float(record.dead_catfish or 0)
-                totals['count'] += 1
-
-            # Calculate mortality rate
-            total_catfish = totals['alive_catfish'] + totals['dead_catfish']
-            mortality_rate = (totals['dead_catfish'] / total_catfish * 100) if total_catfish > 0 else 0
 
             # Create PDF
             buffer = BytesIO()
@@ -232,7 +199,7 @@ class ReportService:
                 parent=styles['Heading1'],
                 fontSize=16,
                 spaceAfter=30,
-                alignment=1  # Center alignment
+                alignment=1
             )
             heading2_style = ParagraphStyle(
                 'CustomHeading2',
@@ -257,8 +224,15 @@ class ReportService:
             # Create story for PDF
             story = []
 
-            # Add title and alert
-            story.append(Paragraph("Dead Catfish Incident Report", title_style))
+            # Add report metadata
+            generated_time = "2025-03-18 13:55:59"  # Current UTC time
+            generated_by = "LexusBelisario"  # Current user
+            
+            story.append(Paragraph("Dead Catfish Incident Report - Case 5", title_style))
+            story.append(Paragraph(
+                f"Report generated on {generated_time} UTC by {generated_by}",
+                normal_style
+            ))
             story.append(Paragraph(
                 f"<b>ALERT:</b> Dead catfish detected at {latest_dead_record.timeData.strftime('%Y-%m-%d %H:%M:%S')}",
                 warning_style
@@ -271,9 +245,9 @@ class ReportService:
                 ["Time of Death", "Total Catfish", "Dead Catfish", "Mortality Rate"],
                 [
                     latest_dead_record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
-                    str(int(totals['alive_catfish'] / totals['count'])),
-                    str(int(latest_dead_record.dead_catfish)), 
-                    f"{(latest_dead_record.dead_catfish / (latest_dead_record.catfish + latest_dead_record.dead_catfish) * 100):.2f}%"
+                    str(int(totals['alive_catfish'] / totals['count']) if totals['count'] > 0 else 0),
+                    str(int(latest_dead_record.dead_catfish)),
+                    f"{(totals['dead_catfish'] / (totals['alive_catfish'] + totals['dead_catfish']) * 100):.2f}%" if (totals['alive_catfish'] + totals['dead_catfish']) > 0 else "0%"
                 ]
             ]
             summary_table = Table(incident_summary)
@@ -288,11 +262,11 @@ class ReportService:
             story.append(summary_table)
             story.append(Spacer(1, 20))
 
-            # Add water parameters at time of death
+            # Add water parameters section
             story.append(Paragraph("Water Parameters at Time of Death", heading2_style))
             death_params = [
                 ["Parameter", "Value", "Status", "Normal Range"],
-                ["Temperature", f"{latest_dead_record.temperature:.2f}°C", 
+                ["Temperature", f"{latest_dead_record.temperature:.2f}°C",
                 self._get_temp_status(latest_dead_record.temperature), "26-32°C"],
                 ["Oxygen", f"{latest_dead_record.oxygen:.2f} mg/L",
                 self._get_oxygen_status(latest_dead_record.oxygen), "1.5-5.0 mg/L"],
@@ -365,7 +339,6 @@ class ReportService:
                     ))
                     story.append(Spacer(1, 12))
                     
-                    # Add warning box
                     warning_text = (
                         "⚠ IMPORTANT: While water parameters are normal, "
                         "the death of a catfish indicates underlying issues that need investigation."
@@ -374,25 +347,19 @@ class ReportService:
                     story.append(warning_para)
                     story.append(Spacer(1, 12))
 
-                    # Add detailed analysis
                     for section in natural_causes:
                         if section.startswith('•') or section.startswith('→'):
-                            # Indent bullet points
                             story.append(Paragraph(f"    {section}", normal_style))
                         elif section.startswith('\n'):
-                            # Add space before new sections
                             story.append(Spacer(1, 8))
                             story.append(Paragraph(section.strip(), normal_style))
                         else:
-                            # Regular text or headers
                             if ':' in section:
-                                # Section headers in bold
                                 story.append(Paragraph(f"<b>{section}</b>", normal_style))
                             else:
                                 story.append(Paragraph(section, normal_style))
                         story.append(Spacer(1, 4))
 
-                    # Add final note
                     story.append(Spacer(1, 12))
                     story.append(Paragraph(
                         "<b>Note:</b> Regular monitoring and preventive measures are crucial "
@@ -405,11 +372,79 @@ class ReportService:
                     story.append(Paragraph(factor, normal_style))
                     story.append(Spacer(1, 8))
 
+            story.append(Spacer(1, 20))
+
+            # Add image section - Only include the first/latest image
+            story.append(PageBreak())
+            story.append(Paragraph("Dead Catfish Image", heading2_style))  # Changed to singular
+            story.append(Spacer(1, 12))
+
+            # Find the first record with an image
+            image_added = False
+            for record in recent_data:
+                if (record.dead_catfish > 0 and 
+                    hasattr(record, 'dead_catfish_image') and 
+                    record.dead_catfish_image and 
+                    not image_added):  # Only process the first image
+                    try:
+                        # Create image with error handling
+                        image = Image(BytesIO(record.dead_catfish_image))
+                        
+                        # Calculate aspect ratio to maintain image proportions
+                        aspect = image.imageWidth / float(image.imageHeight)
+                        
+                        # Set max width to 6 inches, height will adjust automatically
+                        image.drawWidth = 6 * inch
+                        image.drawHeight = (6 * inch) / aspect
+                        
+                        # Add image timestamp
+                        story.append(Paragraph(
+                            f"Image captured at: {record.timeData.strftime('%Y-%m-%d %H:%M:%S')}",
+                            normal_style
+                        ))
+                        story.append(Spacer(1, 6))
+                        story.append(image)
+                        story.append(Spacer(1, 12))
+                        image_added = True
+                        break  # Exit after adding the first image
+                        
+                    except Exception as img_error:
+                        logging.error(f"Error processing image for record at {record.timeData}: {str(img_error)}")
+                        story.append(Paragraph(
+                            f"Error: Unable to process image for record at {record.timeData}",
+                            normal_style
+                        ))
+
+            if not image_added:
+                story.append(Paragraph(
+                    "No image available for this report.",
+                    normal_style
+                ))
+
             # Add detailed data table
             story.append(PageBreak())
             story.append(Paragraph("Detailed Data Log", heading2_style))
             story.append(Spacer(1, 12))
             
+            data = [["Time", "Temperature", "Result", "Oxygen", "Result", 
+                    "pH Level", "Result", "Turbidity", "Result", 
+                    "Alive Catfish", "Dead Catfish"]]
+            
+            for record in recent_data:
+                data.append([
+                    record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
+                    f"{record.temperature:.2f}",
+                    record.tempResult,
+                    f"{record.oxygen:.2f}",
+                    record.oxygenResult,
+                    f"{record.phlevel:.2f}",
+                    record.phResult,
+                    f"{record.turbidity:.2f}",
+                    record.turbidityResult,
+                    str(record.catfish),
+                    str(record.dead_catfish)
+                ])
+
             table = Table(data, repeatRows=1)
             table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
@@ -425,10 +460,28 @@ class ReportService:
             ]))
             story.append(table)
 
+            # Add report footer
+            story.append(PageBreak())
+            story.append(Spacer(1, 20))
+            
+            # Add report metadata footer
+            footer_text = [
+                f"Report Generated: {generated_time} UTC",
+                f"Generated By: {generated_by}",
+                f"Report ID: DCR-{alert_id}",
+                "This report is automatically generated by the Aquaman Monitoring System",
+                "For questions or concerns, please contact the system administrator"
+            ]
+            
+            for line in footer_text:
+                story.append(Paragraph(line, normal_style))
+                story.append(Spacer(1, 4))
+
             # Build PDF
             doc.build(story)
             buffer.seek(0)
 
+            # Return the PDF file
             return send_file(
                 buffer,
                 as_attachment=True,
@@ -438,7 +491,12 @@ class ReportService:
 
         except Exception as e:
             logging.error(f"Error generating dead catfish report: {str(e)}")
-            return jsonify({"error": str(e)})
+            return jsonify({
+                "error": "Failed to generate report",
+                "message": str(e),
+                "timestamp": "2025-03-18 13:58:28",
+                "alert_id": alert_id
+            })
     
     def _generate_analysis_message(self, record, mortality_rate):
         # Temperature analysis
