@@ -157,7 +157,11 @@ class ReportService:
             )
 
             if not latest_dead_record:
-                return jsonify({"message": "No dead catfish detected in the system."})
+                return jsonify({
+                    "message": "No dead catfish detected in the system.",
+                    "timestamp": "2025-03-20 13:29:31",
+                    "reported_by": "New User"
+                })
 
             # Get the previous 1800 records including the time of death
             recent_data = (
@@ -207,12 +211,6 @@ class ReportService:
                 fontSize=14,
                 spaceAfter=12
             )
-            normal_style = ParagraphStyle(
-                'CustomNormal',
-                parent=styles['Normal'],
-                fontSize=10,
-                leading=12
-            )
             warning_style = ParagraphStyle(
                 'WarningStyle',
                 parent=styles['Normal'],
@@ -220,24 +218,108 @@ class ReportService:
                 textColor=colors.red,
                 leading=14
             )
+            normal_style = ParagraphStyle(
+                'CustomNormal',
+                parent=styles['Normal'],
+                fontSize=10,
+                leading=12
+            )
 
             # Create story for PDF
             story = []
 
-            # Add report metadata
-            generated_time = "2025-03-18 13:55:59"  # Current UTC time
-            generated_by = "LexusBelisario"  # Current user
-            
-            story.append(Paragraph("Dead Catfish Incident Report - Case 5", title_style))
+            # Add critical alert section first
+            story.append(Paragraph("Case 5 - Dead Catfish Detected", title_style))
             story.append(Paragraph(
-                f"Report generated on {generated_time} UTC by {generated_by}",
-                normal_style
-            ))
-            story.append(Paragraph(
-                f"<b>ALERT:</b> Dead catfish detected at {latest_dead_record.timeData.strftime('%Y-%m-%d %H:%M:%S')}",
+                "IMMEDIATE ACTION REQUIRED: Remove dead catfish immediately to prevent water contamination!",
                 warning_style
             ))
             story.append(Spacer(1, 12))
+
+            # Add water regulation recommendations based on parameters
+            water_regulations = []
+            
+            # Temperature-based recommendations
+            if latest_dead_record.temperature >= 35:
+                water_regulations.append(
+                    "• CRITICAL: Water temperature is dangerously high. Take immediate action:\n"
+                    "  - Cool down water temperature immediately\n"
+                    "  - Add fresh, cooler water\n"
+                    "  - Provide shade from direct sunlight\n"
+                    "  - Consider adding cooling system"
+                )
+            elif latest_dead_record.temperature >= 32:
+                water_regulations.append(
+                    "• Water temperature is above optimal range:\n"
+                    "  - Gradually reduce water temperature\n"
+                    "  - Monitor temperature every hour\n"
+                    "  - Check for heat sources"
+                )
+            elif latest_dead_record.temperature <= 20:
+                water_regulations.append(
+                    "• CRITICAL: Water temperature is dangerously low. Take immediate action:\n"
+                    "  - Increase water temperature gradually\n"
+                    "  - Add warm water carefully\n"
+                    "  - Check heater functionality"
+                )
+            elif latest_dead_record.temperature < 26:
+                water_regulations.append(
+                    "• Water temperature is below optimal range:\n"
+                    "  - Gradually increase water temperature\n"
+                    "  - Monitor temperature every hour"
+                )
+
+            # Oxygen-based recommendations
+            if latest_dead_record.oxygen <= 0.8:
+                water_regulations.append(
+                    "• CRITICAL: Oxygen levels are critically low. Take immediate action:\n"
+                    "  - Increase aeration immediately\n"
+                    "  - Add air stones or oxygen supply\n"
+                    "  - Perform partial water change"
+                )
+            elif latest_dead_record.oxygen < 1.5:
+                water_regulations.append(
+                    "• Low oxygen levels detected:\n"
+                    "  - Increase water movement\n"
+                    "  - Check aeration system\n"
+                    "  - Monitor oxygen levels hourly"
+                )
+
+            # pH-based recommendations
+            if latest_dead_record.phlevel < 4 or latest_dead_record.phlevel > 9:
+                water_regulations.append(
+                    "• CRITICAL: pH levels are at extreme levels. Take immediate action:\n"
+                    "  - Perform immediate water change\n"
+                    "  - Test water source before adding\n"
+                    "  - Monitor pH levels every hour"
+                )
+            elif latest_dead_record.phlevel < 6 or latest_dead_record.phlevel > 7.5:
+                water_regulations.append(
+                    "• pH levels are outside optimal range:\n"
+                    "  - Perform partial water change\n"
+                    "  - Monitor pH levels regularly"
+                )
+
+            # Add water regulation recommendations to report
+            if water_regulations:
+                story.append(Paragraph("Water Quality Regulation Required:", heading2_style))
+                for regulation in water_regulations:
+                    story.append(Paragraph(regulation, normal_style))
+                    story.append(Spacer(1, 8))
+
+            # Add immediate action steps
+            story.append(Paragraph("Required Immediate Actions:", heading2_style))
+            immediate_actions = [
+                "1. Remove dead catfish IMMEDIATELY regardless of water parameters",
+                "2. Document time and conditions of death",
+                "3. Perform water quality tests",
+                "4. Implement recommended water regulations as listed above",
+                "5. Monitor remaining catfish for signs of stress",
+                "6. Test water parameters every 2-3 hours after changes"
+            ]
+            for action in immediate_actions:
+                story.append(Paragraph(action, normal_style))
+                story.append(Spacer(1, 4))
 
             # Add incident summary
             story.append(Paragraph("Incident Summary", heading2_style))
@@ -245,9 +327,9 @@ class ReportService:
                 ["Time of Death", "Total Catfish", "Dead Catfish", "Mortality Rate"],
                 [
                     latest_dead_record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
-                    str(int(totals['alive_catfish'] / totals['count']) if totals['count'] > 0 else 0),
-                    str(int(latest_dead_record.dead_catfish)),
-                    f"{(totals['dead_catfish'] / (totals['alive_catfish'] + totals['dead_catfish']) * 100):.2f}%" if (totals['alive_catfish'] + totals['dead_catfish']) > 0 else "0%"
+                    str(latest_dead_record.catfish),
+                    str(latest_dead_record.dead_catfish),
+                    f"{(latest_dead_record.dead_catfish / (latest_dead_record.catfish + latest_dead_record.dead_catfish) * 100):.2f}%"
                 ]
             ]
             summary_table = Table(incident_summary)
@@ -287,105 +369,64 @@ class ReportService:
             story.append(params_table)
             story.append(Spacer(1, 20))
 
-            # Add critical factors analysis
-            story.append(Paragraph("Critical Factors Analysis", heading2_style))
-            critical_factors = []
+            # Check for natural causes if no critical water parameters
+            natural_causes = self._check_natural_causes(latest_dead_record)
+            if natural_causes:
+                story.append(Paragraph("Analysis of Non-Water Quality Factors", heading2_style))
+                for section in natural_causes:
+                    story.append(Paragraph(section, normal_style))
+                    story.append(Spacer(1, 4))
 
-            # Analyze temperature
-            if latest_dead_record.temperature <= 20 or latest_dead_record.temperature >= 35:
-                critical_factors.append(
-                    f"• Temperature ({latest_dead_record.temperature:.1f}°C) was at dangerous levels\n"
-                    f"  Possible causes: {self._get_temperature_causes(latest_dead_record.temperature)}"
-                )
-            elif 20 < latest_dead_record.temperature < 26 or 32 <= latest_dead_record.temperature < 35:
-                critical_factors.append(
-                    f"• Temperature ({latest_dead_record.temperature:.1f}°C) was at suboptimal levels\n"
-                    f"  Possible causes: {self._get_temperature_causes(latest_dead_record.temperature)}"
-                )
-
-            # Analyze oxygen
-            if latest_dead_record.oxygen <= 0.8:
-                critical_factors.append(
-                    f"• Oxygen level ({latest_dead_record.oxygen:.2f} mg/L) was critically low\n"
-                    "  Possible causes: Overstocking, Stagnant water, Poor ventilation, Overfeeding"
-                )
-            elif latest_dead_record.oxygen < 1.5:
-                critical_factors.append(
-                    f"• Oxygen level ({latest_dead_record.oxygen:.2f} mg/L) was dangerously low\n"
-                    "  Possible causes: High fish density, Poor water circulation"
-                )
-
-            # Analyze pH
-            if latest_dead_record.phlevel < 4 or latest_dead_record.phlevel > 9:
-                critical_factors.append(
-                    f"• pH level ({latest_dead_record.phlevel:.2f}) was at extreme levels\n"
-                    f"  Possible causes: {self._get_ph_causes(latest_dead_record.phlevel)}"
-                )
-
-            # Analyze turbidity
-            if latest_dead_record.turbidity >= 50:
-                critical_factors.append(
-                    f"• Turbidity ({latest_dead_record.turbidity:.1f} NTU) was very high\n"
-                    "  Possible causes: Excess waste, Poor filtration, High particle content"
-                )
-
-            if not critical_factors:
-                # Check for natural causes if no water quality issues found
-                natural_causes = self._check_natural_causes(latest_dead_record)
-                if natural_causes:
-                    story.append(Paragraph(
-                        "ANALYSIS OF NON-WATER QUALITY FACTORS",
-                        heading2_style
-                    ))
-                    story.append(Spacer(1, 12))
-                    
-                    warning_text = (
-                        "⚠ IMPORTANT: While water parameters are normal, "
-                        "the death of a catfish indicates underlying issues that need investigation."
-                    )
-                    warning_para = Paragraph(warning_text, warning_style)
-                    story.append(warning_para)
-                    story.append(Spacer(1, 12))
-
-                    for section in natural_causes:
-                        if section.startswith('•') or section.startswith('→'):
-                            story.append(Paragraph(f"    {section}", normal_style))
-                        elif section.startswith('\n'):
-                            story.append(Spacer(1, 8))
-                            story.append(Paragraph(section.strip(), normal_style))
-                        else:
-                            if ':' in section:
-                                story.append(Paragraph(f"<b>{section}</b>", normal_style))
-                            else:
-                                story.append(Paragraph(section, normal_style))
-                        story.append(Spacer(1, 4))
-
-                    story.append(Spacer(1, 12))
-                    story.append(Paragraph(
-                        "<b>Note:</b> Regular monitoring and preventive measures are crucial "
-                        "even when water parameters are normal. Consider implementing a comprehensive "
-                        "health management plan for the remaining catfish.",
-                        normal_style
-                    ))
-            else:
-                for factor in critical_factors:
-                    story.append(Paragraph(factor, normal_style))
-                    story.append(Spacer(1, 8))
-
-            story.append(Spacer(1, 20))
-
-            # Add image section - Only include the first/latest image
+            # Add detailed data table
             story.append(PageBreak())
-            story.append(Paragraph("Dead Catfish Image", heading2_style))  # Changed to singular
+            story.append(Paragraph("Detailed Data Log", heading2_style))
             story.append(Spacer(1, 12))
 
-            # Find the first record with an image
+            data = [["Time", "Temperature", "Result", "Oxygen", "Result",
+                    "pH Level", "Result", "Turbidity", "Result",
+                    "Alive Catfish", "Dead Catfish"]]
+
+            for record in recent_data:
+                data.append([
+                    record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
+                    f"{record.temperature:.2f}",
+                    record.tempResult,
+                    f"{record.oxygen:.2f}",
+                    record.oxygenResult,
+                    f"{record.phlevel:.2f}",
+                    record.phResult,
+                    f"{record.turbidity:.2f}",
+                    record.turbidityResult,
+                    str(record.catfish),
+                    str(record.dead_catfish)
+                ])
+
+            table = Table(data, repeatRows=1)
+            table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.white),
+                ("TEXTCOLOR", (0, 1), (-1, -1), colors.black),
+                ("FONTSIZE", (0, 1), (-1, -1), 7),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            story.append(table)
+            story.append(Spacer(1, 20))
+
+            # Add dead catfish image section
+            story.append(Paragraph("Dead Catfish Documentation", heading2_style))
+            story.append(Spacer(1, 12))
+
+            # Find the record with an image
             image_added = False
             for record in recent_data:
                 if (record.dead_catfish > 0 and 
                     hasattr(record, 'dead_catfish_image') and 
-                    record.dead_catfish_image and 
-                    not image_added):  # Only process the first image
+                    record.dead_catfish_image):
                     try:
                         # Create image with error handling
                         image = Image(BytesIO(record.dead_catfish_image))
@@ -417,57 +458,17 @@ class ReportService:
 
             if not image_added:
                 story.append(Paragraph(
-                    "No image available for this report.",
+                    "No image available for this incident.",
                     normal_style
                 ))
 
-            # Add detailed data table
-            story.append(PageBreak())
-            story.append(Paragraph("Detailed Data Log", heading2_style))
-            story.append(Spacer(1, 12))
-            
-            data = [["Time", "Temperature", "Result", "Oxygen", "Result", 
-                    "pH Level", "Result", "Turbidity", "Result", 
-                    "Alive Catfish", "Dead Catfish"]]
-            
-            for record in recent_data:
-                data.append([
-                    record.timeData.strftime("%Y-%m-%d %H:%M:%S"),
-                    f"{record.temperature:.2f}",
-                    record.tempResult,
-                    f"{record.oxygen:.2f}",
-                    record.oxygenResult,
-                    f"{record.phlevel:.2f}",
-                    record.phResult,
-                    f"{record.turbidity:.2f}",
-                    record.turbidityResult,
-                    str(record.catfish),
-                    str(record.dead_catfish)
-                ])
-
-            table = Table(data, repeatRows=1)
-            table.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, 0), 8),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
-                ("BACKGROUND", (0, 1), (-1, -1), colors.white),
-                ("TEXTCOLOR", (0, 1), (-1, -1), colors.black),
-                ("FONTSIZE", (0, 1), (-1, -1), 7),
-                ("GRID", (0, 0), (-1, -1), 1, colors.black),
-            ]))
-            story.append(table)
-
-            # Add report footer
+            # Add report metadata
             story.append(PageBreak())
             story.append(Spacer(1, 20))
             
-            # Add report metadata footer
             footer_text = [
-                f"Report Generated: {generated_time} UTC",
-                f"Generated By: {generated_by}",
+                f"Report Generated: 2025-03-20 13:29:31 UTC",
+                f"Generated By: LexusBelisario",
                 f"Report ID: DCR-{alert_id}",
                 "This report is automatically generated by the Aquaman Monitoring System",
                 "For questions or concerns, please contact the system administrator"
@@ -481,11 +482,11 @@ class ReportService:
             doc.build(story)
             buffer.seek(0)
 
-            # Return the PDF file
+            logging.info("Sending PDF file")
             return send_file(
                 buffer,
                 as_attachment=True,
-                download_name=f"dead-catfish-report-{latest_dead_record.timeData.strftime('%B-%d-%Y').lower()}.pdf",
+                download_name=f"dead-catfish-report-{latest_dead_record.timeData.strftime('%Y%m%d')}.pdf",
                 mimetype="application/pdf"
             )
 
@@ -494,8 +495,9 @@ class ReportService:
             return jsonify({
                 "error": "Failed to generate report",
                 "message": str(e),
-                "timestamp": "2025-03-18 13:58:28",
-                "alert_id": alert_id
+                "timestamp": "2025-03-20 13:29:31",
+                "alert_id": alert_id,
+                "reported_by": "User"
             })
     
     def _generate_analysis_message(self, record, mortality_rate):
@@ -1436,6 +1438,534 @@ class ReportService:
         except Exception as e:
             logging.error(f"Error generating report: {str(e)}")
             return jsonify({"message": "An error occurred while generating the report."}), 500
+        
+    
+    def generate_incident_report(self):
+        """Generate incident report based on water parameter fluctuations"""
+        try:
+            logging.info("Starting incident report generation")
+            
+            # Get the latest record
+            latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()
+            
+            if not latest_record:
+                return jsonify({
+                    "message": "No data available in the system.",
+                    "timestamp": "2025-03-20 14:12:39",
+                    "reported_by": "LexusBelisario"
+                })
+
+            # Get previous records for comparison (last 10 records)
+            recent_records = (
+                aquamans.query.order_by(aquamans.timeData.desc())
+                .limit(10)
+                .all()
+            )
+            
+            # Initialize fluctuation tracking
+            fluctuations = {
+                'temperature': [],
+                'oxygen': [],
+                'phlevel': []
+            }
+            
+            # Check each parameter for fluctuations
+            for i in range(1, len(recent_records)):
+                prev_record = recent_records[i]
+                curr_record = recent_records[i-1]
+                
+                # Temperature fluctuation check based on ranges
+                temp = curr_record.temperature
+                if temp < 19 or temp > 33:
+                    fluctuations['temperature'].append({
+                        'type': 'major',
+                        'value': temp,
+                        'time': curr_record.timeData,
+                        'status': 'Critical Temperature Level'
+                    })
+                elif (20 <= temp <= 25) or (27 <= temp <= 32):
+                    fluctuations['temperature'].append({
+                        'type': 'minor',
+                        'value': temp,
+                        'time': curr_record.timeData,
+                        'status': 'Minor Temperature Level'
+                    })
+
+                # Oxygen fluctuation check based on ranges
+                oxy = curr_record.oxygen
+                if oxy < 1 or oxy > 7:
+                    fluctuations['oxygen'].append({
+                        'type': 'major',
+                        'value': oxy,
+                        'time': curr_record.timeData,
+                        'status': 'Critical Oxygen Level'
+                    })
+                elif (1.0 <= oxy <= 1.4) or (5 <= oxy <= 6):
+                    fluctuations['oxygen'].append({
+                        'type': 'minor',
+                        'value': oxy,
+                        'time': curr_record.timeData,
+                        'status': 'Stress Oxygen Range'
+                    })
+
+                # pH fluctuation check based on ranges
+                ph = curr_record.phlevel
+                if ph < 4 or ph > 8.5:
+                    fluctuations['phlevel'].append({
+                        'type': 'major',
+                        'value': ph,
+                        'time': curr_record.timeData,
+                        'status': 'Major pH Level'
+                    })
+                elif (5 <= ph <= 5.9) or (7.6 <= ph <= 8.5):
+                    fluctuations['phlevel'].append({
+                        'type': 'minor',
+                        'value': ph,
+                        'time': curr_record.timeData,
+                        'status': 'Minor pH Level'
+                    })
+
+            # Count fluctuations
+            minor_fluctuations = sum(1 for param in fluctuations.values() 
+                                for fluc in param if fluc['type'] == 'minor')
+            major_fluctuations = sum(1 for param in fluctuations.values() 
+                                for fluc in param if fluc['type'] == 'major')
+
+            # Determine case
+            if major_fluctuations > 0:
+                case = {
+                    'number': 4,
+                    'title': 'Case 4: Major Parameter Fluctuations',
+                    'description': 'Critical levels detected in water parameters.',
+                    'severity': 'Critical',
+                    'alert_level': 'Red'
+                }
+            elif minor_fluctuations >= 2:
+                case = {
+                    'number': 3,
+                    'title': 'Case 3: Multiple Minor Fluctuations',
+                    'description': 'Multiple stress conditions detected across parameters.',
+                    'severity': 'High',
+                    'alert_level': 'Orange'
+                }
+            elif minor_fluctuations == 1:
+                case = {
+                    'number': 2,
+                    'title': 'Case 2: Single Minor Fluctuation',
+                    'description': 'Minor stress condition detected.',
+                    'severity': 'Medium',
+                    'alert_level': 'Yellow'
+                }
+            else:
+                case = {
+                    'number': 1,
+                    'title': 'Case 1: Normal Readings',
+                    'description': 'All parameters within optimal ranges.',
+                    'severity': 'Normal',
+                    'alert_level': 'Green'
+                }
+
+            # Create parameter status messages
+            current_status = {
+                "temperature": {
+                    "value": latest_record.temperature,
+                    "status": self._get_temperature_status(latest_record.temperature),
+                    "normal_range": "26-32°C",
+                    "effects": self._get_temperature_effects(latest_record.temperature)
+                },
+                "oxygen": {
+                    "value": latest_record.oxygen,
+                    "status": self._get_oxygen_status(latest_record.oxygen),
+                    "normal_range": "1.5-5.0 mg/L",
+                    "effects": self._get_oxygen_effects(latest_record.oxygen)
+                },
+                "phlevel": {
+                    "value": latest_record.phlevel,
+                    "status": self._get_ph_status(latest_record.phlevel),
+                    "normal_range": "6.0-7.5",
+                    "effects": self._get_ph_effects(latest_record.phlevel)
+                }
+            }
+
+            # Create response
+            response = {
+                "case": case,
+                "current_readings": current_status,
+                "fluctuations": fluctuations,
+                "recommendations": self._get_recommendations(case['number'], fluctuations),
+                "timestamp": "2025-03-20 14:12:39",
+                "reported_by": "User",
+                "incident_id": f"INC{latest_record.timeData.strftime('%Y%m%d%H%M')}"
+            }
+
+            return jsonify(response)
+
+        except Exception as e:
+            logging.error(f"Error generating incident report: {str(e)}")
+            return jsonify({
+                "error": "Failed to generate incident report",
+                "message": str(e),
+                "timestamp": "2025-03-20 14:12:39",
+                "reported_by": "User"
+            })    
+        
+    def _get_temperature_status(self, temp):
+        """Get temperature status based on range"""
+        if 26 <= temp <= 32:
+            return "Normal Temperature Level"
+        elif (20 <= temp <= 25) or (27 <= temp <= 32):
+            return "Minor Temperature Level"
+        elif temp < 19 or temp > 33:
+            return "Critical Temperature Level"
+        return "Temperature Out of Range"
+    
+    def _get_oxygen_status(self, oxy):
+        """Get oxygen status based on range"""
+        if 1.5 <= oxy <= 5:
+            return "Normal Oxygen Level"
+        elif (1.0 <= oxy <= 1.4) or (5 <= oxy <= 6):
+            return "Stress Oxygen Range"
+        elif oxy < 1 or oxy > 7:
+            return "Critical Oxygen Level"
+        return "Oxygen Out of Range"
+    
+    def _get_ph_status(self, ph):
+        """Get pH status based on range"""
+        if 6 <= ph <= 7.5:
+            return "Normal pH Level"
+        elif (5 <= ph <= 5.9) or (7.6 <= ph <= 8.5):
+            return "Minor pH Level"
+        elif ph < 4 or ph > 8.5:
+            return "Critical pH Level"
+        return "pH Out of Range"
+    
+    def _get_temperature_effects(self, temp):
+        """Get temperature effects on catfish"""
+        if 26 <= temp <= 32:
+            return "Optimal for catfish growth, feed intake and health will significantly increase."
+        elif (20 <= temp <= 25) or (27 <= temp <= 32):
+            return "Minor stress and slightly reduces growth rate and feed intake. Health rates may also decrease."
+        elif temp < 19 or temp > 33:
+            return "Rate of mortality significantly increases; catfish will possibly die in a few hours or days."
+        return "Temperature conditions are severely affecting catfish health."
+    
+    def _get_oxygen_effects(self, oxy):
+        """Get oxygen effects on catfish"""
+        if 1.5 <= oxy <= 5:
+            return "Optimal for catfish growth, feed intake and health will significantly increase."
+        elif (1.0 <= oxy <= 1.4) or (5 <= oxy <= 6):
+            return "Significant stress, reduced immunity, risk of disease."
+        elif oxy < 1 or oxy > 7:
+            return "High mortality risk; catfish may die within hours."
+        return "Oxygen conditions are severely affecting catfish health."
+    
+    def _get_ph_effects(self, ph):
+        """Get pH effects on catfish"""
+        if 6 <= ph <= 7.5:
+            return "Optimal for catfish growth, feed intake and health will significantly increase."
+        elif (5 <= ph <= 5.9) or (7.6 <= ph <= 8.5):
+            return "Minor stress conditions; reduced growth, feed intake, and immune function."
+        elif ph < 4 or ph > 8.5:
+            return "Severe stress; catfish will possibly die in a few hours or days."
+        return "pH conditions are severely affecting catfish health."
+    
+    def _get_recommendations(self, case_number, fluctuations):
+        """Generate recommendations based on case number and specific parameter ranges"""
+        recommendations = []
+        
+        if case_number == 1:
+            recommendations.append({
+                "priority": "Low",
+                "action": "Maintain Current Conditions",
+                "details": [
+                    "Temperature (26-32°C): Optimal for catfish growth",
+                    "Oxygen (1.5-5 mg/L): Optimal for feed intake",
+                    "pH (6-7.5): Optimal for overall health",
+                    "Continue regular monitoring schedule"
+                ],
+                "timestamp": "2025-03-20 14:14:27",
+                "reported_by": "LexusBelisario"
+            })
+        
+        elif case_number == 2:
+            # Check which parameter has the minor fluctuation
+            for param, fluc_list in fluctuations.items():
+                if fluc_list and fluc_list[0]['type'] == 'minor':
+                    if param == 'temperature':
+                        if 20 <= fluc_list[0]['value'] <= 25:
+                            recommendations.append({
+                                "priority": "Medium",
+                                "action": "Address Below Optimal Temperature",
+                                "details": [
+                                    "Minor stress condition detected",
+                                    "Current temperature reducing growth rate",
+                                    "Actions required:",
+                                    "- Gradually increase water temperature",
+                                    "- Check heater functionality",
+                                    "- Monitor temperature every 2 hours",
+                                    "- Document temperature changes",
+                                    "- Check environmental factors"
+                                ]
+                            })
+                        elif 27 <= fluc_list[0]['value'] <= 32:
+                            recommendations.append({
+                                "priority": "Medium",
+                                "action": "Address Above Optimal Temperature",
+                                "details": [
+                                    "Minor stress condition detected",
+                                    "Temperature affecting feed intake",
+                                    "Actions required:",
+                                    "- Gradually reduce water temperature",
+                                    "- Check for external heat sources",
+                                    "- Monitor temperature every 2 hours",
+                                    "- Document temperature changes",
+                                    "- Evaluate cooling system"
+                                ]
+                            })
+                    
+                    elif param == 'oxygen':
+                        if 1.0 <= fluc_list[0]['value'] <= 1.4:
+                            recommendations.append({
+                                "priority": "Medium",
+                                "action": "Address Low Oxygen Stress",
+                                "details": [
+                                    "Stress oxygen range detected",
+                                    "Reduced immunity risk identified",
+                                    "Actions required:",
+                                    "- Increase aeration immediately",
+                                    "- Check water circulation",
+                                    "- Monitor oxygen levels hourly",
+                                    "- Reduce feeding temporarily",
+                                    "- Prepare for water change if needed"
+                                ]
+                            })
+                        elif 5 <= fluc_list[0]['value'] <= 6:
+                            recommendations.append({
+                                "priority": "Medium",
+                                "action": "Address High Oxygen Stress",
+                                "details": [
+                                    "Above optimal oxygen range",
+                                    "Stress conditions present",
+                                    "Actions required:",
+                                    "- Adjust aeration system",
+                                    "- Reduce water agitation",
+                                    "- Monitor oxygen levels hourly",
+                                    "- Check equipment functionality",
+                                    "- Document oxygen changes"
+                                ]
+                            })
+                    
+                    elif param == 'phlevel':
+                        if 5 <= fluc_list[0]['value'] <= 5.9:
+                            recommendations.append({
+                                "priority": "Medium",
+                                "action": "Address Acidic pH Condition",
+                                "details": [
+                                    "Minor acidic conditions detected",
+                                    "Growth and immune impact possible",
+                                    "Actions required:",
+                                    "- Plan 25% water change",
+                                    "- Test source water pH",
+                                    "- Monitor pH every 2 hours",
+                                    "- Check for acidic influences",
+                                    "- Document pH changes"
+                                ]
+                            })
+                        elif 7.6 <= fluc_list[0]['value'] <= 8.5:
+                            recommendations.append({
+                                "priority": "Medium",
+                                "action": "Address Alkaline pH Condition",
+                                "details": [
+                                    "Minor alkaline conditions detected",
+                                    "Growth and immune impact possible",
+                                    "Actions required:",
+                                    "- Plan 25% water change",
+                                    "- Test source water pH",
+                                    "- Monitor pH every 2 hours",
+                                    "- Check for alkaline influences",
+                                    "- Document pH changes"
+                                ]
+                            })
+        
+        elif case_number == 3:
+            recommendations.append({
+                "priority": "High",
+                "action": "Address Multiple Parameter Fluctuations",
+                "details": [
+                    "Multiple stress conditions detected",
+                    "Significant impact on catfish health",
+                    "Immediate actions required:",
+                    "- Perform 30-40% water change",
+                    "- Monitor all parameters hourly",
+                    "- Check all equipment functionality",
+                    "- Document all parameter changes",
+                    "- Prepare for emergency measures"
+                ]
+            })
+            
+            # Add specific recommendations for each affected parameter
+            for param, fluc_list in fluctuations.items():
+                if fluc_list:
+                    if param == 'temperature':
+                        recommendations.append({
+                            "priority": "High",
+                            "action": "Temperature Stress Management",
+                            "details": [
+                                "Combined stress with other parameters",
+                                "Actions required:",
+                                "- Stabilize temperature gradually",
+                                "- Monitor every hour",
+                                "- Check environmental factors",
+                                "- Verify equipment operation",
+                                "- Prepare backup temperature control"
+                            ]
+                        })
+                    elif param == 'oxygen':
+                        recommendations.append({
+                            "priority": "High",
+                            "action": "Oxygen Level Management",
+                            "details": [
+                                "Combined stress with other parameters",
+                                "Actions required:",
+                                "- Optimize aeration system",
+                                "- Monitor oxygen hourly",
+                                "- Check for oxygen depletion",
+                                "- Reduce stressful activities",
+                                "- Prepare emergency aeration"
+                            ]
+                        })
+                    elif param == 'phlevel':
+                        recommendations.append({
+                            "priority": "High",
+                            "action": "pH Level Management",
+                            "details": [
+                                "Combined stress with other parameters",
+                                "Actions required:",
+                                "- Monitor pH changes hourly",
+                                "- Prepare for water change",
+                                "- Test water source quality",
+                                "- Check for pH influences",
+                                "- Document all changes"
+                            ]
+                        })
+        
+        elif case_number == 4:
+            recommendations.append({
+                "priority": "Critical",
+                "action": "CRITICAL PARAMETER ALERT",
+                "details": [
+                    "IMMEDIATE ACTION REQUIRED",
+                    "Critical water parameters detected",
+                    "Core actions required:",
+                    "- Prepare for emergency water change",
+                    "- Monitor parameters every 30 minutes",
+                    "- Check all life support systems",
+                    "- Document all changes",
+                    "- Prepare emergency equipment"
+                ]
+            })
+            
+            # Add specific critical recommendations
+            for param, fluc_list in fluctuations.items():
+                if fluc_list and fluc_list[0]['type'] == 'major':
+                    if param == 'temperature':
+                        if fluc_list[0]['value'] < 19:
+                            recommendations.append({
+                                "priority": "Critical",
+                                "action": "Critical Low Temperature Alert",
+                                "details": [
+                                    "Mortality risk - Temperature too low",
+                                    "Emergency actions required:",
+                                    "- Increase temperature (max 2°C/hour)",
+                                    "- Verify heater operation",
+                                    "- Prepare warm water exchange",
+                                    "- Monitor catfish behavior",
+                                    "- Document temperature changes"
+                                ]
+                            })
+                        else:  # > 33
+                            recommendations.append({
+                                "priority": "Critical",
+                                "action": "Critical High Temperature Alert",
+                                "details": [
+                                    "Mortality risk - Temperature too high",
+                                    "Emergency actions required:",
+                                    "- Decrease temperature (max 2°C/hour)",
+                                    "- Remove heat sources",
+                                    "- Add cooling measures",
+                                    "- Monitor catfish behavior",
+                                    "- Document temperature changes"
+                                ]
+                            })
+                    
+                    elif param == 'oxygen':
+                        if fluc_list[0]['value'] < 1:
+                            recommendations.append({
+                                "priority": "Critical",
+                                "action": "Critical Low Oxygen Alert",
+                                "details": [
+                                    "Severe hypoxia condition",
+                                    "Emergency actions required:",
+                                    "- Maximize aeration immediately",
+                                    "- Emergency water change",
+                                    "- Add supplemental oxygen",
+                                    "- Monitor fish continuously",
+                                    "- Document oxygen changes"
+                                ]
+                            })
+                        else:  # > 7
+                            recommendations.append({
+                                "priority": "Critical",
+                                "action": "Critical High Oxygen Alert",
+                                "details": [
+                                    "Dangerous supersaturation",
+                                    "Emergency actions required:",
+                                    "- Reduce aeration immediately",
+                                    "- Check equipment malfunction",
+                                    "- Perform water change",
+                                    "- Monitor fish continuously",
+                                    "- Document oxygen changes"
+                                ]
+                            })
+                    
+                    elif param == 'phlevel':
+                        if fluc_list[0]['value'] < 4:
+                            recommendations.append({
+                                "priority": "Critical",
+                                "action": "Critical Low pH Alert",
+                                "details": [
+                                    "Severe acidic conditions",
+                                    "Emergency actions required:",
+                                    "- Immediate water change",
+                                    "- Test source water",
+                                    "- Check for contamination",
+                                    "- Monitor fish continuously",
+                                    "- Document pH changes"
+                                ]
+                            })
+                        else:  # > 8.5
+                            recommendations.append({
+                                "priority": "Critical",
+                                "action": "Critical High pH Alert",
+                                "details": [
+                                    "Severe alkaline conditions",
+                                    "Emergency actions required:",
+                                    "- Immediate water change",
+                                    "- Test source water",
+                                    "- Check contamination sources",
+                                    "- Monitor fish continuously",
+                                    "- Document pH changes"
+                                ]
+                            })
+        
+        # Add timestamp and user information to all recommendations
+        for rec in recommendations:
+            rec.update({
+                "timestamp": "2025-03-20 14:14:27",
+                "reported_by": "LexusBelisario"
+            })
+        
+        return recommendations
 
         # checkout
         
