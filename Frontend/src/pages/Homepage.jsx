@@ -210,7 +210,7 @@ export default function Homepage({ setAuth }) {
 
       {/* Navbar with Notifications */}
       <div className="fixed top-0 left-0 right-0 z-50">
-        <div className="flex justify-between items-center bg-white shadow">
+        <div className="flex justify-between items-center bg-[#28282B]">
           <Navbar />
           <div className="mr-4">
             <ErrorBoundary>

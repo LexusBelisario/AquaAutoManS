@@ -212,7 +212,7 @@ export default function WaterQualityAlertBox({ alerts = [], removeAlert }) {
       {/* Notification Bell Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-gray-600 hover:text-blue-600 focus:outline-none"
+        className="relative p-2 text-[#E3D9C6] hover:text-[#8C7B6B] focus:outline-none"
       >
         <svg
           className="w-6 h-6"
