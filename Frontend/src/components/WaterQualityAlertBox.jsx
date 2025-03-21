@@ -173,7 +173,7 @@ const checkParameterFluctuation = (param, value) => {
       return { hasFluctuation: false, isMajor: false };
 
     case "phlevel":
-      if (value < 4.0 || value > 8.5)
+      if (value < 5 || value >= 8.5)
         return { hasFluctuation: true, isMajor: true }; // Major
       if (value >= 5.0 && value <= 5.9)
         return { hasFluctuation: true, isMajor: false }; // Minor

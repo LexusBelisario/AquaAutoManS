@@ -4,7 +4,7 @@ from datetime import datetime
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib import colors
 import logging
 import base64
@@ -12,12 +12,12 @@ import base64
 class IncidentService:
     def __init__(self):
         self.current_timestamp = "2025-03-21 12:14:25"
-        self.current_user = "User"
+        self.current_LexusBelisario = "LexusBelisario"
 
     def generate_incident_report(self):
         """Generate incident report based on water parameter fluctuations"""
         try:
-            logging.info(f"Starting incident report generation at {self.current_timestamp}")
+            logging.info(f"Starting incident report generation at 2025-03-21 15:41:10")
             
             # Get the latest record
             latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()
@@ -25,7 +25,7 @@ class IncidentService:
             if not latest_record:
                 return {
                     "message": "No data available in the system.",
-                    "timestamp": "2025-03-21 15:12:43",
+                    "timestamp": "2025-03-21 15:41:10",
                     "reported_by": "LexusBelisario"
                 }
 
@@ -80,7 +80,7 @@ class IncidentService:
 
             # pH check
             ph = latest_record.phlevel
-            if ph < 4 or ph > 8.5:
+            if ph < 5 or ph > 8.5:
                 fluctuations['phlevel'].append({
                     'type': 'major',
                     'value': ph,
@@ -106,37 +106,8 @@ class IncidentService:
                     elif param_fluctuations[0]['type'] == 'minor':
                         minor_fluctuations += 1
 
-            # Check for Case 5 first (Catfish death)
-            has_died = latest_record.dead_catfish > 0
-            has_fluctuations = major_fluctuations > 0 or minor_fluctuations > 0
-
-            if has_died:
-                if has_fluctuations:
-                    case = {
-                        'number': 5,
-                        'title': 'Case 5: Catfish Mortality with Parameter Fluctuations',
-                        'description': 'Catfish death detected with water quality issues.',
-                        'severity': 'Emergency',
-                        'alert_level': 'Purple',
-                        'death_cause': 'Parameter fluctuations likely contributed to mortality.'
-                    }
-                else:
-                    case = {
-                        'number': 5,
-                        'title': 'Case 5: Unexpected Catfish Mortality',
-                        'description': 'Catfish death detected with normal parameters.',
-                        'severity': 'Emergency',
-                        'alert_level': 'Purple',
-                        'death_cause': 'No parameter fluctuations detected. Possible causes include:\n' +
-                                    '• Natural causes or age\n' +
-                                    '• Disease or parasites\n' +
-                                    '• Physical injury\n' +
-                                    '• Stress from handling\n' +
-                                    '• Recent feeding issues\n' +
-                                    '• Social aggression'
-                    }
-            # Determine case based on the latest readings if no death
-            elif major_fluctuations > 0:
+            # Determine case based on the latest readings
+            if major_fluctuations > 0:
                 case = {
                     'number': 4,
                     'title': 'Case 4: Major Parameter Fluctuations',
@@ -191,12 +162,11 @@ class IncidentService:
                 }
             }
 
-            # Get catfish counts and image from latest record
+            # Get catfish counts from latest record
             catfish_info = {
                 "alive_count": latest_record.catfish if hasattr(latest_record, 'catfish') else "N/A",
                 "dead_count": latest_record.dead_catfish if hasattr(latest_record, 'dead_catfish') else "N/A",
-                "timestamp": latest_record.timeData.strftime('%Y-%m-%d %H:%M:%S') if latest_record.timeData else "2025-03-21 15:12:43",
-                "dead_catfish_image": latest_record.dead_catfish_image if hasattr(latest_record, 'dead_catfish_image') else None
+                "timestamp": latest_record.timeData.strftime('%Y-%m-%d %H:%M:%S') if latest_record.timeData else "2025-03-21 15:41:10"
             }
 
             # Create response with all information
@@ -205,7 +175,7 @@ class IncidentService:
                 "current_readings": current_status,
                 "fluctuations": fluctuations,
                 "recommendations": self._get_recommendations(case['number'], fluctuations),
-                "timestamp": "2025-03-21 15:12:43",
+                "timestamp": "2025-03-21 15:41:10",
                 "reported_by": "LexusBelisario",
                 "incident_id": f"INC{latest_record.timeData.strftime('%Y%m%d%H%M')}",
                 "catfish_info": catfish_info
@@ -218,7 +188,7 @@ class IncidentService:
             return {
                 "error": True,
                 "message": str(e),
-                "timestamp": "2025-03-21 15:12:43",
+                "timestamp": "2025-03-21 15:41:10",
                 "reported_by": "LexusBelisario"
             }
         
@@ -248,7 +218,7 @@ class IncidentService:
             return "Normal pH Level"
         elif (5 <= ph <= 5.9) or (7.6 <= ph <= 8.5):
             return "Minor pH Level"
-        elif ph < 4 or ph > 8.5:
+        elif ph < 5 or ph > 8.5:
             return "Critical pH Level"
         return "pH Out of Range"
     
@@ -278,7 +248,7 @@ class IncidentService:
             return "Optimal for catfish growth, feed intake and health will significantly increase."
         elif (5 <= ph <= 5.9) or (7.6 <= ph <= 8.5):
             return "Minor stress conditions; reduced growth, feed intake, and immune function."
-        elif ph < 4 or ph > 8.5:
+        elif ph < 5 or ph > 8.5:
             return "Severe stress; catfish will possibly die in a few hours or days."
         return "pH conditions are severely affecting catfish health."
     
@@ -294,7 +264,6 @@ class IncidentService:
                     "Emergency Alert:",
                     "• Document time and conditions of death",
                     "• Collect water samples for testing",
-                    "• Photograph deceased catfish",
                     "• Remove deceased catfish promptly",
                     "• Monitor remaining catfish closely"
                 ],
@@ -307,7 +276,7 @@ class IncidentService:
                 base_recommendations["details"].extend([
                     "Parameter-Related Actions:",
                     "• Conduct full water quality analysis",
-                    "• Prepare for emergency water change",
+                    "• Change the Aquarium Water Immediately!",
                     "• Check all equipment functionality",
                     "• Consider moving healthy fish if needed"
                 ])
@@ -327,7 +296,7 @@ class IncidentService:
         
         elif case_number == 1:
             recommendations.append({
-                "priority": "Low",
+                "priority": "None",
                 "action": "Maintain Current Conditions",
                 "details": [
                     "Current Status:",
@@ -740,55 +709,6 @@ class IncidentService:
             ]))
             elements.append(meta_table)
             elements.append(Spacer(1, 20))
-
-            # Add Case 5 specific information if applicable
-            if report_data['case'].get('number') == 5:
-                elements.append(Paragraph("Mortality Analysis", heading2_style))
-                elements.append(Spacer(1, 10))
-                
-                mortality_data = [
-                    ['Death Cause:', report_data['case']['death_cause']],
-                    ['Time of Death:', report_data['catfish_info']['timestamp']],
-                    ['Parameters Status:', 
-                    'Abnormal - Contributing to mortality' if any(report_data['fluctuations'].values()) 
-                    else 'Normal - Other causes suspected']
-                ]
-                
-                mortality_table = Table(mortality_data, colWidths=[120, 350])
-                mortality_table.setStyle(TableStyle([
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                    ('BACKGROUND', (0, 0), (0, -1), colors.purple),
-                    ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                    ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, -1), 10),
-                    ('TOPPADDING', (0, 0), (-1, -1), 6),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 8),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-                ]))
-                elements.append(mortality_table)
-                elements.append(Spacer(1, 15))
-
-                # Add image if available
-                if report_data['catfish_info'].get('dead_catfish_image'):
-                    try:
-                        img_path = report_data['catfish_info']['dead_catfish_image']
-                        img = Image(img_path)
-                        
-                        # Scale image to fit in the document
-                        max_width = 400
-                        max_height = 300
-                        img.drawWidth = min(img.drawWidth, max_width)
-                        img.drawHeight = min(img.drawHeight, max_height)
-                        
-                        elements.append(Paragraph("Mortality Documentation", heading2_style))
-                        elements.append(Spacer(1, 10))
-                        elements.append(img)
-                        elements.append(Spacer(1, 15))
-                    except Exception as img_error:
-                        logging.error(f"Error adding image to PDF: {str(img_error)}")
-                        elements.append(Paragraph("Image could not be loaded", normal_style))
             
             # Add current readings section
             elements.append(Paragraph("Current Readings", heading2_style))
@@ -873,26 +793,11 @@ class IncidentService:
             elements.append(Spacer(1, 20))
             elements.append(Paragraph(footer_text, normal_style))
             
-            # Build PDF and convert to base64
+            # Build PDF
             doc.build(elements)
             buffer.seek(0)
-            pdf_bytes = buffer.getvalue()
-            pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
-            
-            return {
-                "success": True,
-                "data": pdf_base64,
-                "timestamp": "2025-03-21 15:22:05",
-                "reported_by": "LexusBelisario",
-                "content_type": "application/pdf",
-                "encoding": "base64"
-            }
+            return buffer
             
         except Exception as e:
             logging.error(f"Error generating PDF report: {str(e)}")
-            return {
-                "error": True,
-                "message": str(e),
-                "timestamp": "2025-03-21 15:22:05",
-                "reported_by": "LexusBelisario"
-            }
+            raise Exception(f"Failed to generate PDF report: {str(e)}")
