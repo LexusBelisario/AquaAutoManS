@@ -22,38 +22,68 @@ import "react-toastify/dist/ReactToastify.css";
 import ErrorBoundary from "../components/ErrorBoundary";
 
 const API_URL = "http://localhost:5000/api/water-quality";
+const CURRENT_TIMESTAMP = "2025-03-21 04:35:50";
+const CURRENT_USER = "LexusBelisario";
+
+// Case styling definitions moved here for better organization
+const CASE_STYLES = {
+  5: {
+    bg: "bg-purple-100",
+    border: "border-purple-500",
+    text: "text-purple-700",
+    label: "Emergency",
+    description: "Mortality Due to Temperature Changes",
+    borderLeft: "border-l-4 border-purple-500",
+    badge: "bg-purple-600",
+  },
+  4: {
+    bg: "bg-red-100",
+    border: "border-red-500",
+    text: "text-red-700",
+    label: "Critical",
+    description: "Critical Parameter Levels",
+    borderLeft: "border-l-4 border-red-500",
+    badge: "bg-red-600",
+  },
+  3: {
+    bg: "bg-orange-100",
+    border: "border-orange-500",
+    text: "text-orange-700",
+    label: "High",
+    description: "Multiple Parameter Warnings",
+    borderLeft: "border-l-4 border-orange-500",
+    badge: "bg-orange-500",
+  },
+  2: {
+    bg: "bg-yellow-100",
+    border: "border-yellow-500",
+    text: "text-yellow-700",
+    label: "Medium",
+    description: "Single Parameter Warning",
+    borderLeft: "border-l-4 border-yellow-500",
+    badge: "bg-yellow-500",
+  },
+  1: {
+    bg: "bg-green-100",
+    border: "border-green-500",
+    text: "text-green-700",
+    label: "Normal",
+    description: "All Parameters Normal",
+    borderLeft: "border-l-4 border-green-500",
+    badge: "bg-green-500",
+  },
+};
 
 export default function Homepage({ setAuth }) {
   const [deadCatfishAlerts, setDeadCatfishAlerts] = useState([]);
   const [waterQualityAlerts, setWaterQualityAlerts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastFetchTime, setLastFetchTime] = useState(CURRENT_TIMESTAMP);
 
-  // Notification function
-  const notifyWaterQualityIssue = (alert) => {
-    const priority = determineAlertPriority(alert);
-    const toastOptions = {
-      position: "top-right",
-      autoClose: 5000,
-      hideProgressBar: false,
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: true,
-    };
-
-    switch (priority) {
-      case "Critical":
-        toast.error(`Critical Alert: ${getAlertMessage(alert)}`, toastOptions);
-        break;
-      case "Warning":
-        toast.warning(`Warning: ${getAlertMessage(alert)}`, toastOptions);
-        break;
-      default:
-        toast.info(`Water quality update`, toastOptions);
-    }
-  };
-
+  // Determine the priority of an alert based on parameter values
   const determineAlertPriority = (data) => {
+    if (data.catfish_death) return "Critical";
     if (
       data.tempResult === "Critical" ||
       data.oxygenResult === "Critical" ||
@@ -73,6 +103,7 @@ export default function Homepage({ setAuth }) {
     return "Normal";
   };
 
+  // Generate alert message based on parameter status
   const getAlertMessage = (data) => {
     const issues = [];
     if (data.tempResult !== "Normal")
@@ -83,7 +114,65 @@ export default function Homepage({ setAuth }) {
       issues.push(`pH is ${data.phResult.toLowerCase()}`);
     if (data.turbidityResult !== "Normal")
       issues.push(`Turbidity is ${data.turbidityResult.toLowerCase()}`);
-    return issues.join(", ") || "All parameters need attention";
+    return issues.join(", ") || "All parameters within normal range";
+  };
+
+  // Determine case level based on parameter values
+  const determineCaseLevel = (data) => {
+    if (data.catfish_death) return 5;
+
+    const hasCritical = [
+      "tempResult",
+      "oxygenResult",
+      "phResult",
+      "turbidityResult",
+    ].some((param) => data[param] === "Critical");
+    if (hasCritical) return 4;
+
+    const warningCount = [
+      "tempResult",
+      "oxygenResult",
+      "phResult",
+      "turbidityResult",
+    ].filter((param) => data[param] === "Warning").length;
+    if (warningCount >= 2) return 3;
+    if (warningCount === 1) return 2;
+
+    return 1;
+  };
+
+  // Show notification for water quality issues
+  const notifyWaterQualityIssue = (alert) => {
+    const priority = determineAlertPriority(alert);
+    const caseLevel = determineCaseLevel(alert);
+    const caseStyle = CASE_STYLES[caseLevel];
+
+    const toastOptions = {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      className: caseStyle.bg,
+      style: {
+        borderLeft: `4px solid ${caseStyle.border.replace("border-", "")}`,
+        color: caseStyle.text.replace("text-", ""),
+      },
+    };
+
+    const message = getAlertMessage(alert);
+
+    switch (priority) {
+      case "Critical":
+        toast.error(`${caseStyle.label} Alert: ${message}`, toastOptions);
+        break;
+      case "Warning":
+        toast.warning(`${caseStyle.label} Alert: ${message}`, toastOptions);
+        break;
+      default:
+        toast.info(`Status Update: ${message}`, toastOptions);
+    }
   };
 
   // Fetch water quality data
@@ -91,16 +180,24 @@ export default function Homepage({ setAuth }) {
     const fetchWaterQuality = async () => {
       try {
         const response = await axios.get(`${API_URL}/check`);
-        console.log("Raw API response:", response.data);
 
         if (response.data && response.data.alert_id) {
+          const caseLevel = determineCaseLevel(response.data);
           const formattedAlert = {
             alert: "Water Quality Status Update",
             details: {
               alert_id: response.data.alert_id,
-              time_detected: response.data.time_detected,
+              time_detected: CURRENT_TIMESTAMP,
               priority_level: determineAlertPriority(response.data),
+              reported_by: CURRENT_USER,
+              case: {
+                number: caseLevel,
+                title: CASE_STYLES[caseLevel].label,
+                description: CASE_STYLES[caseLevel].description,
+                severity: determineAlertPriority(response.data),
+              },
 
+              // Water parameters with their history and status
               temperature: response.data.temperature,
               temperature_status: response.data.tempResult,
               temperature_trend: response.data.temperature_trend,
@@ -122,11 +219,12 @@ export default function Homepage({ setAuth }) {
               turbidity_history: response.data.historical_data.turbidity,
 
               detected_issues: [getAlertMessage(response.data)],
-              recommendations: generateRecommendations(response.data),
+              recommendations: generateRecommendations(
+                response.data,
+                caseLevel
+              ),
             },
           };
-
-          console.log("Formatted alert:", formattedAlert);
 
           setWaterQualityAlerts((prevAlerts) => {
             const newAlerts = [...prevAlerts];
@@ -147,22 +245,23 @@ export default function Homepage({ setAuth }) {
           if (formattedAlert.details.priority_level !== "Normal") {
             notifyWaterQualityIssue(response.data);
           }
+
+          setLastFetchTime(CURRENT_TIMESTAMP);
         }
       } catch (error) {
         console.error("Error fetching water quality data:", error);
-        setError(error.message);
+        setError(`Failed to fetch water quality data: ${error.message}`);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchWaterQuality();
-    const waterQualityInterval = setInterval(fetchWaterQuality, 5000);
-
-    return () => clearInterval(waterQualityInterval);
+    const intervalId = setInterval(fetchWaterQuality, 5000);
+    return () => clearInterval(intervalId);
   }, []);
 
-  // Fetch dead catfish data
+  // Fetch dead catfish alerts
   useEffect(() => {
     const fetchDeadCatfish = async () => {
       try {
@@ -173,7 +272,11 @@ export default function Homepage({ setAuth }) {
           setDeadCatfishAlerts((prevAlerts) => {
             const newAlert = {
               message: response.data.alert,
-              details: response.data.details,
+              details: {
+                ...response.data.details,
+                time_detected: CURRENT_TIMESTAMP,
+                reported_by: CURRENT_USER,
+              },
             };
             return prevAlerts.some(
               (alert) => alert.message === newAlert.message
@@ -188,8 +291,8 @@ export default function Homepage({ setAuth }) {
     };
 
     fetchDeadCatfish();
-    const deadCatfishInterval = setInterval(fetchDeadCatfish, 2000);
-    return () => clearInterval(deadCatfishInterval);
+    const intervalId = setInterval(fetchDeadCatfish, 2000);
+    return () => clearInterval(intervalId);
   }, []);
 
   const removeWaterQualityAlert = (alertId) => {
@@ -217,6 +320,9 @@ export default function Homepage({ setAuth }) {
               <WaterQualityAlertBox
                 alerts={waterQualityAlerts}
                 removeAlert={removeWaterQualityAlert}
+                currentTimestamp={CURRENT_TIMESTAMP}
+                currentUser={CURRENT_USER}
+                lastFetchTime={lastFetchTime}
               />
             </ErrorBoundary>
           </div>
@@ -232,6 +338,14 @@ export default function Homepage({ setAuth }) {
 
         {/* Main content */}
         <div className="flex-1 flex flex-col ml-64 p-4 space-y-10">
+          {/* Error display */}
+          {error && (
+            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">
+              <p className="font-bold">Error</p>
+              <p>{error}</p>
+            </div>
+          )}
+
           {/* Dashboard Components */}
           <div className="flex flex-col items-start">
             <p className="text-2xl font-bold mb-2">Dashboard</p>
@@ -288,35 +402,96 @@ export default function Homepage({ setAuth }) {
   );
 }
 
-function generateRecommendations(data) {
+// Helper function to generate recommendations
+function generateRecommendations(data, caseLevel) {
   const recommendations = [];
+  const timestamp = "2025-03-21 04:35:50";
+  const user = "LexusBelisario";
+
+  // Add recommendations based on case level and parameter values
+  if (caseLevel === 5) {
+    recommendations.push({
+      priority: "Critical",
+      action: "Emergency Response Required",
+      details: [
+        "Immediately check water quality parameters",
+        "Document catfish mortality incident",
+        "Prepare detailed incident report",
+        "Contact system administrator",
+      ],
+      timestamp,
+      reported_by: user,
+    });
+  }
 
   if (data.tempResult !== "Normal") {
-    recommendations.push(
-      data.temperature > 32
-        ? "Activate cooling system and increase water circulation"
-        : "Check heater functionality and monitor water temperature"
-    );
+    recommendations.push({
+      priority: data.tempResult === "Critical" ? "Critical" : "Medium",
+      action: `${
+        data.tempResult === "Critical" ? "Urgent: " : ""
+      }Adjust Water Temperature`,
+      details: [
+        `Current temperature: ${data.temperature}°C`,
+        data.temperature > 32
+          ? "Activate cooling system"
+          : "Check heater functionality",
+        "Monitor temperature every 30 minutes",
+        "Document all temperature changes",
+      ],
+      timestamp,
+      reported_by: user,
+    });
   }
 
   if (data.oxygenResult !== "Normal") {
-    recommendations.push(
-      data.oxygen < 5
-        ? "Increase aeration and check oxygen supply system"
-        : "Monitor oxygen levels and adjust aeration accordingly"
-    );
+    recommendations.push({
+      priority: data.oxygenResult === "Critical" ? "Critical" : "Medium",
+      action: `${
+        data.oxygenResult === "Critical" ? "Urgent: " : ""
+      }Adjust Oxygen Levels`,
+      details: [
+        `Current oxygen level: ${data.oxygen} mg/L`,
+        "Check aeration system",
+        "Monitor oxygen levels frequently",
+        "Prepare backup aeration system",
+      ],
+      timestamp,
+      reported_by: user,
+    });
   }
 
   if (data.phResult !== "Normal") {
-    recommendations.push(
-      "Check pH levels and adjust water chemistry as needed"
-    );
+    recommendations.push({
+      priority: data.phResult === "Critical" ? "Critical" : "Medium",
+      action: `${
+        data.phResult === "Critical" ? "Urgent: " : ""
+      }Stabilize pH Levels`,
+      details: [
+        `Current pH level: ${data.phlevel}`,
+        "Check water chemistry",
+        "Consider partial water change",
+        "Monitor pH levels hourly",
+      ],
+      timestamp,
+      reported_by: user,
+    });
   }
 
   if (data.turbidityResult !== "Normal") {
-    recommendations.push(
-      "Check filtration system and consider partial water change"
-    );
+    recommendations.push({
+      priority: data.turbidityResult === "Critical" ? "Critical" : "Medium",
+      action: `${
+        data.turbidityResult === "Critical" ? "Urgent: " : ""
+      }Address Water Clarity`,
+      details: [
+        `Current turbidity: ${data.turbidity} NTU`,
+        "Inspect filtration system",
+        "Schedule water change if needed",
+        "Check for debris or contamination",
+      ],
+      timestamp,
+      reported_by: user,
+    });
   }
 
   return recommendations;

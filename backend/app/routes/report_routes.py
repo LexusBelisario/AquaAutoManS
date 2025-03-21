@@ -1,7 +1,16 @@
-from flask import Blueprint, jsonify, request, Response
+from flask import Blueprint, jsonify, request, Response, send_file, current_app
 from app.services.report_service import ReportService
 from app import cache
 from datetime import datetime
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from io import BytesIO
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('report', __name__)
 report_service = ReportService()
@@ -42,6 +51,7 @@ def print_data_report():
             "error": "An error occurred while generating the report",
             "details": str(e)
         }), 500
+        
 
 # Add error handlers for the blueprint
 @bp.errorhandler(404)

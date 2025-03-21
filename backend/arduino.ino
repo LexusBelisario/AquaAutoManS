@@ -54,7 +54,7 @@ void loop() {
   else if (temperature <= 20) {
     Serial.print("ColdTemperature");
   } 
-  else if (temperature > 26 && temperature < 35) {
+  else if ( temperature < 35) {
     Serial.print("AboveAverageTemperature");
   } 
   else if (temperature >= 35) {
