@@ -25,7 +25,6 @@ const API_URL = "http://localhost:5000/api/water-quality";
 const CURRENT_TIMESTAMP = "2025-03-21 04:35:50";
 const CURRENT_USER = "LexusBelisario";
 
-// Case styling definitions moved here for better organization
 const CASE_STYLES = {
   5: {
     bg: "bg-purple-100",
@@ -81,7 +80,6 @@ export default function Homepage({ setAuth }) {
   const [error, setError] = useState(null);
   const [lastFetchTime, setLastFetchTime] = useState(CURRENT_TIMESTAMP);
 
-  // Determine the priority of an alert based on parameter values
   const determineAlertPriority = (data) => {
     if (data.catfish_death) return "Critical";
     if (
@@ -103,7 +101,6 @@ export default function Homepage({ setAuth }) {
     return "Normal";
   };
 
-  // Generate alert message based on parameter status
   const getAlertMessage = (data) => {
     const issues = [];
     if (data.tempResult !== "Normal")
@@ -117,7 +114,6 @@ export default function Homepage({ setAuth }) {
     return issues.join(", ") || "All parameters within normal range";
   };
 
-  // Determine case level based on parameter values
   const determineCaseLevel = (data) => {
     if (data.catfish_death) return 5;
 
@@ -141,7 +137,6 @@ export default function Homepage({ setAuth }) {
     return 1;
   };
 
-  // Show notification for water quality issues
   const notifyWaterQualityIssue = (alert) => {
     const priority = determineAlertPriority(alert);
     const caseLevel = determineCaseLevel(alert);
@@ -175,7 +170,6 @@ export default function Homepage({ setAuth }) {
     }
   };
 
-  // Fetch water quality data
   useEffect(() => {
     const fetchWaterQuality = async () => {
       try {
@@ -197,7 +191,6 @@ export default function Homepage({ setAuth }) {
                 severity: determineAlertPriority(response.data),
               },
 
-              // Water parameters with their history and status
               temperature: response.data.temperature,
               temperature_status: response.data.tempResult,
               temperature_trend: response.data.temperature_trend,
@@ -239,7 +232,7 @@ export default function Homepage({ setAuth }) {
               newAlerts[existingAlertIndex] = formattedAlert;
             }
 
-            return newAlerts.slice(0, 5); // Keep only last 5 alerts
+            return newAlerts.slice(0, 5);
           });
 
           if (formattedAlert.details.priority_level !== "Normal") {
@@ -261,7 +254,6 @@ export default function Homepage({ setAuth }) {
     return () => clearInterval(intervalId);
   }, []);
 
-  // Fetch dead catfish alerts
   useEffect(() => {
     const fetchDeadCatfish = async () => {
       try {
@@ -402,13 +394,11 @@ export default function Homepage({ setAuth }) {
   );
 }
 
-// Helper function to generate recommendations
 function generateRecommendations(data, caseLevel) {
   const recommendations = [];
   const timestamp = "2025-03-21 04:35:50";
   const user = "LexusBelisario";
 
-  // Add recommendations based on case level and parameter values
   if (caseLevel === 5) {
     recommendations.push({
       priority: "Critical",

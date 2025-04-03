@@ -31,7 +31,7 @@ export const LineGraphOxygen = () => {
 
   const processOxygenData = useMemo(
     () => (data) => {
-      console.log("Processing oxygen data:", data); // Debug log
+      console.log("Processing oxygen data:", data);
 
       if (!Array.isArray(data) || data.length === 0) {
         console.log("No oxygen data to process");
@@ -65,37 +65,33 @@ export const LineGraphOxygen = () => {
           ],
         };
       } else {
-        // For weekly view
         const dailyData = {
-          0: [], // Monday
-          1: [], // Tuesday
-          2: [], // Wednesday
-          3: [], // Thursday
-          4: [], // Friday
-          5: [], // Saturday
-          6: [], // Sunday
+          0: [],
+          1: [],
+          2: [],
+          3: [],
+          4: [],
+          5: [],
+          6: [],
         };
 
-        // Group data by day
         data.forEach((entry) => {
           const date = new Date(entry.timeData);
-          // Convert Sunday (0) to 6, and other days to 0-5
           const dayIndex = (date.getDay() + 6) % 7;
           if (entry.oxygen != null) {
             dailyData[dayIndex].push(entry.oxygen);
           }
         });
 
-        console.log("Grouped daily oxygen data:", dailyData); // Debug log
+        console.log("Grouped daily oxygen data:", dailyData);
 
-        // Calculate averages
         const avgOxygenLevels = Object.values(dailyData).map((levels) => {
           if (levels.length === 0) return 0;
           const sum = levels.reduce((acc, level) => acc + level, 0);
           return parseFloat((sum / levels.length).toFixed(2));
         });
 
-        console.log("Calculated oxygen averages:", avgOxygenLevels); // Debug log
+        console.log("Calculated oxygen averages:", avgOxygenLevels);
 
         return {
           labels: [
@@ -141,13 +137,13 @@ export const LineGraphOxygen = () => {
         url += `&week_start=${weekStart}`;
       }
 
-      console.log("Fetching oxygen data from:", url); // Debug log
+      console.log("Fetching oxygen data from:", url);
 
       setLoading(true);
       const response = await fetch(url);
       const data = await response.json();
 
-      console.log("Raw oxygen data from API:", data); // Debug log
+      console.log("Raw oxygen data from API:", data);
 
       if (!Array.isArray(data)) {
         console.error("Invalid oxygen data format received:", data);
@@ -156,7 +152,7 @@ export const LineGraphOxygen = () => {
       }
 
       const processedData = processOxygenData(data);
-      console.log("Processed oxygen data:", processedData); // Debug log
+      console.log("Processed oxygen data:", processedData);
 
       setCache((prevCache) => ({
         ...prevCache,

@@ -10,7 +10,6 @@ const LiveVideoFeed = () => {
     deadCatfish: 0,
   });
 
-  // Fetch system status
   useEffect(() => {
     const checkSystemStatus = async () => {
       try {
@@ -32,7 +31,6 @@ const LiveVideoFeed = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Format time remaining
   const formatTimeRemaining = (seconds) => {
     if (!seconds) return "";
     const minutes = Math.floor(seconds / 60);

@@ -19,7 +19,6 @@ class IncidentService:
         try:
             logging.info(f"Starting incident report generation at 2025-03-21 15:41:10")
             
-            # Get the latest record
             latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()
             
             if not latest_record:
@@ -29,22 +28,18 @@ class IncidentService:
                     "reported_by": "LexusBelisario"
                 }
 
-            # Get previous records for comparison (last 10 records)
             recent_records = (
                 aquamans.query.order_by(aquamans.timeData.desc())
                 .limit(10)
                 .all()
             )
             
-            # Initialize fluctuation tracking
             fluctuations = {
                 'temperature': [],
                 'oxygen': [],
                 'phlevel': []
             }
             
-            # Check the latest record's parameters for fluctuations
-            # Temperature check
             temp = latest_record.temperature
             if temp < 19 or temp > 33:
                 fluctuations['temperature'].append({
@@ -61,7 +56,6 @@ class IncidentService:
                     'status': 'Minor Temperature Level'
                 })
 
-            # Oxygen check
             oxy = latest_record.oxygen
             if oxy < 1 or oxy > 7:
                 fluctuations['oxygen'].append({
@@ -78,7 +72,6 @@ class IncidentService:
                     'status': 'Stress Oxygen Range'
                 })
 
-            # pH check
             ph = latest_record.phlevel
             if ph < 5 or ph > 8.5:
                 fluctuations['phlevel'].append({
@@ -95,18 +88,16 @@ class IncidentService:
                     'status': 'Minor pH Level'
                 })
 
-            # Count fluctuations more accurately
             minor_fluctuations = 0
             major_fluctuations = 0
             
             for param_fluctuations in fluctuations.values():
-                if param_fluctuations:  # If there are any fluctuations for this parameter
+                if param_fluctuations: 
                     if param_fluctuations[0]['type'] == 'major':
                         major_fluctuations += 1
                     elif param_fluctuations[0]['type'] == 'minor':
                         minor_fluctuations += 1
 
-            # Determine case based on the latest readings
             if major_fluctuations > 0:
                 case = {
                     'number': 4,
@@ -140,7 +131,6 @@ class IncidentService:
                     'alert_level': 'Green'
                 }
 
-            # Create parameter status messages
             current_status = {
                 "temperature": {
                     "value": latest_record.temperature,
@@ -162,14 +152,12 @@ class IncidentService:
                 }
             }
 
-            # Get catfish counts from latest record
             catfish_info = {
                 "alive_count": latest_record.catfish if hasattr(latest_record, 'catfish') else "N/A",
                 "dead_count": latest_record.dead_catfish if hasattr(latest_record, 'dead_catfish') else "N/A",
                 "timestamp": latest_record.timeData.strftime('%Y-%m-%d %H:%M:%S') if latest_record.timeData else "2025-03-21 15:41:10"
             }
 
-            # Create response with all information
             response = {
                 "case": case,
                 "current_readings": current_status,
@@ -196,7 +184,7 @@ class IncidentService:
         """Get temperature status based on range"""
         if 26 <= temp <= 32:
             return "Normal Temperature Level"
-        elif (20 <= temp < 26) or (27 <= temp <= 32):
+        elif (20 <= temp < 26) or (32 < temp <= 33):
             return "Minor Temperature Level"
         elif temp < 19 or temp > 33:
             return "Critical Temperature Level"
@@ -226,7 +214,7 @@ class IncidentService:
         """Get temperature effects on catfish"""
         if 26 <= temp <= 32:
             return "Optimal for catfish growth, feed intake and health will significantly increase."
-        elif (20 <= temp < 26) or (27 <= temp <= 32):
+        elif (20 <= temp < 26) or (32 < temp <= 33):
             return "Minor stress and slightly reduces growth rate and feed intake. Health rates may also decrease."
         elif temp < 19 or temp > 33:
             return "Rate of mortality significantly increases; catfish will possibly die in a few hours or days."
@@ -272,7 +260,6 @@ class IncidentService:
             }
             
             if any(fluctuations.values()):
-                # Death with parameter fluctuations
                 base_recommendations["details"].extend([
                     "Parameter-Related Actions:",
                     "• Conduct full water quality analysis",
@@ -281,7 +268,6 @@ class IncidentService:
                     "• Consider moving healthy fish if needed"
                 ])
             else:
-                # Death with normal parameters
                 base_recommendations["details"].extend([
                     "Investigation Points:",
                     "• Check for physical injuries",
@@ -296,26 +282,26 @@ class IncidentService:
         
         elif case_number == 1:
             recommendations.append({
-                "priority": "None",
+                "priority": "Low", 
                 "action": "Maintain Current Conditions",
                 "details": [
                     "Current Status:",
                     "• Temperature (26-32°C): Optimal for catfish growth",
                     "• Oxygen (1.5-5 mg/L): Optimal for feed intake",
                     "• pH (6-7.5): Optimal for overall health",
-                    "Actions Required:",
-                    "• Continue regular monitoring schedule",
-                    "• Document parameter readings",
+                    "Regular Maintenance Actions:",
+                    "• Check Sensors Regularly",
+                    "• Clean Aquarium Slightly",
                     "• Maintain feeding schedule",
-                    "• Check equipment regularly",
+                    "• Calibrate Sensors to ensure accurate readings",
                     "• Monitor catfish behavior"
+                    "• Perform Weekly Cleaning of Aquarium and Sensors",
                 ],
-                "timestamp": "2025-03-21 15:12:43",
+                "timestamp": "2025-03-22 03:32:47",
                 "reported_by": "LexusBelisario"
             })
         
         elif case_number == 2:
-            # Check which parameter has the minor fluctuation
             for param, fluc_list in fluctuations.items():
                 if fluc_list and fluc_list[0]['type'] == 'minor':
                     if param == 'temperature':
@@ -425,7 +411,7 @@ class IncidentService:
                                 "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
-                    break  # Exit after finding the first minor fluctuation for Case 2
+                    break
         
         elif case_number == 3:
             recommendations.append({
@@ -445,7 +431,6 @@ class IncidentService:
                 "reported_by": "LexusBelisario"
             })
             
-            # Add specific recommendations for each affected parameter
             for param, fluc_list in fluctuations.items():
                 if fluc_list:
                     if param == 'temperature':
@@ -515,7 +500,6 @@ class IncidentService:
                 "reported_by": "LexusBelisario"
             })
             
-            # Add specific critical recommendations
             for param, fluc_list in fluctuations.items():
                 if fluc_list and fluc_list[0]['type'] == 'major':
                     if param == 'temperature':
@@ -535,7 +519,7 @@ class IncidentService:
                                 "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
-                        else:  # > 33
+                        else:
                             recommendations.append({
                                 "priority": "Critical",
                                 "action": "Critical High Temperature Alert",
@@ -569,7 +553,7 @@ class IncidentService:
                                 "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
-                        else:  # > 7
+                        else: 
                             recommendations.append({
                                 "priority": "Critical",
                                 "action": "Critical High Oxygen Alert",
@@ -603,7 +587,7 @@ class IncidentService:
                                 "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
-                        else:  # > 8.5
+                        else:
                             recommendations.append({
                                 "priority": "Critical",
                                 "action": "Critical High pH Alert",
@@ -627,7 +611,6 @@ class IncidentService:
         try:
             buffer = BytesIO()
             
-            # Create the PDF document
             doc = SimpleDocTemplate(
                 buffer,
                 pagesize=letter,
@@ -637,18 +620,16 @@ class IncidentService:
                 bottomMargin=50
             )
             
-            # Container for PDF elements
             elements = []
             styles = getSampleStyleSheet()
             
-            # Custom styles with proper spacing and formatting
             title_style = ParagraphStyle(
                 'CustomTitle',
                 parent=styles['Heading1'],
                 fontSize=16,
                 spaceAfter=20,
                 spaceBefore=20,
-                alignment=1,  # Center alignment
+                alignment=1,
                 textColor=colors.HexColor('#2C3E50')
             )
             
@@ -678,22 +659,19 @@ class IncidentService:
                 bold=True
             )
             
-            # Add title
             title = f"Water Quality Incident Report - Case {report_data['case']['number']}"
             elements.append(Paragraph(title, title_style))
             elements.append(Spacer(1, 20))
             
-            # Add report metadata with catfish information
             metadata = [
                 ['Report ID:', incident_id],
-                ['Generated On:', report_data['catfish_info']['timestamp']],
+                ['Generated On:', report_data['catfish_info']['timestamp']], 
                 ['Generated By:', "LexusBelisario"],
                 ['Case Level:', f"Case {report_data['case']['number']} - {report_data['case']['severity']}"],
                 ['Description:', report_data['case']['description']],
                 ['Catfish Count:', f"Alive: {report_data['catfish_info']['alive_count']} | Dead: {report_data['catfish_info']['dead_count']}"]
             ]
             
-            # Create metadata table
             meta_table = Table(metadata, colWidths=[120, 350])
             meta_table.setStyle(TableStyle([
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
@@ -710,9 +688,17 @@ class IncidentService:
             elements.append(meta_table)
             elements.append(Spacer(1, 20))
             
-            # Add current readings section
             elements.append(Paragraph("Current Readings", heading2_style))
             elements.append(Spacer(1, 10))
+
+            if report_data['case']['number'] == 1:
+                for param, data in report_data['current_readings'].items():
+                    if param == 'temperature' and 26 <= data['value'] <= 32:
+                        data['status'] = "✓ " + data['status']
+                    elif param == 'oxygen' and 1.5 <= data['value'] <= 5:
+                        data['status'] = "✓ " + data['status']
+                    elif param == 'phlevel' and 6 <= data['value'] <= 7.5:
+                        data['status'] = "✓ " + data['status']
             
             for param, data in report_data['current_readings'].items():
                 readings_data = [
@@ -740,23 +726,18 @@ class IncidentService:
                 elements.append(readings_table)
                 elements.append(Spacer(1, 15))
             
-            # Add recommendations section
             if report_data.get('recommendations'):
                 elements.append(Paragraph("Recommendations", heading2_style))
                 elements.append(Spacer(1, 10))
                 
                 for rec in report_data['recommendations']:
-                    # Format recommendation details
                     formatted_details = []
                     for detail in rec['details']:
                         if detail.endswith(':'):
-                            # Bold headers
                             formatted_details.append(Paragraph(f"<b>{detail}</b>", normal_style))
                         elif detail.startswith('•'):
-                            # Bullet points already formatted
                             formatted_details.append(Paragraph(f"{detail}", normal_style))
                         elif detail.startswith('-'):
-                            # Convert dashes to bullet points
                             formatted_details.append(Paragraph(f"    • {detail[2:]}", normal_style))
                         else:
                             formatted_details.append(Paragraph(detail, normal_style))
@@ -785,15 +766,13 @@ class IncidentService:
                     elements.append(rec_table)
                     elements.append(Spacer(1, 15))
             
-            # Add footer with database timestamp
             footer_text = (
-                f"Report generated on {report_data['catfish_info']['timestamp']} by LexusBelisario\n"
+                f"Report generated on {report_data['catfish_info']['timestamp']} by LexusBelisario\n" 
                 f"This report is automatically generated by the Aquaman Monitoring System"
             )
             elements.append(Spacer(1, 20))
             elements.append(Paragraph(footer_text, normal_style))
             
-            # Build PDF
             doc.build(elements)
             buffer.seek(0)
             return buffer

@@ -14,7 +14,6 @@ import annotationPlugin from "chartjs-plugin-annotation";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-// Register ChartJS components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -26,7 +25,6 @@ ChartJS.register(
   annotationPlugin
 );
 
-// Constants for parameter thresholds
 const PARAMETER_THRESHOLDS = {
   temperature: {
     critical_low: 19,
@@ -63,7 +61,6 @@ const PARAMETER_THRESHOLDS = {
   },
 };
 
-// Case styling definitions
 const CASE_STYLES = {
   5: {
     bg: "bg-purple-100",
@@ -112,7 +109,6 @@ const CASE_STYLES = {
   },
 };
 
-// Priority level styling
 const PRIORITY_STYLES = {
   Critical: "bg-red-100 border-red-500 text-red-700",
   High: "bg-orange-100 border-orange-500 text-orange-700",
@@ -128,7 +124,6 @@ const determineCaseLevel = (parameters) => {
   let minorFluctuations = 0;
   let hasMajorFluctuation = false;
 
-  // Check all parameters for fluctuations
   Object.entries(parameters).forEach(([param, value]) => {
     if (["temperature", "oxygen", "phlevel"].includes(param.toLowerCase())) {
       const { hasFluctuation, isMajor } = checkParameterFluctuation(
@@ -144,20 +139,18 @@ const determineCaseLevel = (parameters) => {
     }
   });
 
-  // Case determination based on rules
   if (hasMajorFluctuation) {
-    return 4; // Any major fluctuation is automatically Case 4
+    return 4;
   }
   if (minorFluctuations >= 2) {
-    return 3; // Two or more minor fluctuations
+    return 3;
   }
   if (minorFluctuations === 1) {
-    return 2; // One minor fluctuation
+    return 2;
   }
-  return 1; // Normal conditions
+  return 1;
 };
 
-// Utility Functions
 const checkParameterFluctuation = (param, value) => {
   const thresholds = PARAMETER_THRESHOLDS[param.toLowerCase()];
   if (!thresholds) return { hasFluctuation: false, isMajor: false };
@@ -165,32 +158,31 @@ const checkParameterFluctuation = (param, value) => {
   switch (param.toLowerCase()) {
     case "oxygen":
       if (value < 1.0 || value > 7.0)
-        return { hasFluctuation: true, isMajor: true }; // Major
+        return { hasFluctuation: true, isMajor: true };
       if (value >= 1.0 && value <= 1.4)
-        return { hasFluctuation: true, isMajor: false }; // Minor
+        return { hasFluctuation: true, isMajor: false };
       if (value >= 5.0 && value <= 6.0)
-        return { hasFluctuation: true, isMajor: false }; // Minor
+        return { hasFluctuation: true, isMajor: false };
       return { hasFluctuation: false, isMajor: false };
 
     case "phlevel":
       if (value < 5 || value >= 8.5)
-        return { hasFluctuation: true, isMajor: true }; // Major
+        return { hasFluctuation: true, isMajor: true };
       if (value >= 5.0 && value <= 5.9)
-        return { hasFluctuation: true, isMajor: false }; // Minor
+        return { hasFluctuation: true, isMajor: false };
       if (value >= 7.6 && value <= 8.5)
-        return { hasFluctuation: true, isMajor: false }; // Minor
+        return { hasFluctuation: true, isMajor: false };
       return { hasFluctuation: false, isMajor: false };
 
     case "temperature":
-      // Updated temperature ranges based on specifications
       if (value < 19 || value > 34)
-        return { hasFluctuation: true, isMajor: true }; // Critical (Case 4)
+        return { hasFluctuation: true, isMajor: true };
       if (value >= 20 && value < 26)
-        return { hasFluctuation: true, isMajor: false }; // Minor (Case 2)
+        return { hasFluctuation: true, isMajor: false };
       if (value >= 33 && value <= 34)
-        return { hasFluctuation: true, isMajor: false }; // Minor (Case 2)
+        return { hasFluctuation: true, isMajor: false };
       if (value >= 26 && value <= 32)
-        return { hasFluctuation: false, isMajor: false }; // Normal (Case 1)
+        return { hasFluctuation: false, isMajor: false };
       return { hasFluctuation: false, isMajor: false };
 
     default:
@@ -239,7 +231,6 @@ const getStatusBackgroundColor = (status) => {
   }
 };
 
-// Trend Graph rendering function
 const renderTrendGraph = (data, parameter) => {
   if (!data || !data.datasets || !data.labels) {
     return null;
@@ -277,10 +268,10 @@ const renderTrendGraph = (data, parameter) => {
             if (!thresholds) return "rgba(0, 0, 0, 0.1)";
             const value = context.tick.value;
             if (parameter.toLowerCase() === "temperature") {
-              if (value < 19 || value > 34) return "rgba(239, 68, 68, 0.2)"; // red
+              if (value < 19 || value > 34) return "rgba(239, 68, 68, 0.2)";
               if ((value >= 20 && value <= 25) || (value >= 33 && value <= 34))
-                return "rgba(245, 158, 11, 0.2)"; // yellow
-              if (value >= 26 && value <= 32) return "rgba(34, 197, 94, 0.2)"; // green
+                return "rgba(245, 158, 11, 0.2)";
+              if (value >= 26 && value <= 32) return "rgba(34, 197, 94, 0.2)";
             }
             return "rgba(0, 0, 0, 0.1)";
           },
@@ -332,7 +323,7 @@ export default function WaterQualityAlertBox({ alerts = [], removeAlert }) {
       console.log("Fetching incident report...");
 
       const response = await fetch(
-        "http://localhost:5000/api/incident-report", // Updated URL
+        "http://localhost:5000/api/incident-report",
         {
           method: "GET",
           headers: {
@@ -363,8 +354,8 @@ export default function WaterQualityAlertBox({ alerts = [], removeAlert }) {
       if (hasSignificantChange) {
         setIncidentReport({
           ...data,
-          timestamp: CURRENT_TIMESTAMP, // Updated timestamp
-          reported_by: CURRENT_USER, // Updated user
+          timestamp: CURRENT_TIMESTAMP,
+          reported_by: CURRENT_USER,
         });
         setPreviousCase(data.case.number);
 
@@ -424,7 +415,7 @@ export default function WaterQualityAlertBox({ alerts = [], removeAlert }) {
   const downloadPDF = async (incidentId) => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/incident-report/${incidentId}/pdf`, // Updated URL
+        `http://localhost:5000/api/incident-report/${incidentId}/pdf`,
         {
           method: "GET",
           headers: {
@@ -485,7 +476,6 @@ export default function WaterQualityAlertBox({ alerts = [], removeAlert }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch data effect
   useEffect(() => {
     let intervalId;
 
@@ -504,7 +494,6 @@ export default function WaterQualityAlertBox({ alerts = [], removeAlert }) {
     };
   }, [alerts]);
 
-  // Calculate case counts
   const calculateCaseCounts = (alerts) => {
     return alerts.reduce((counts, alert) => {
       const caseLevel = determineCaseLevel(alert.details || {});

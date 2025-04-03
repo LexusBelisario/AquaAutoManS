@@ -4,7 +4,6 @@ const LatestImage = () => {
   const [imageUrl, setImageUrl] = useState(null);
 
   useEffect(() => {
-    // Fetch the image URL
     fetch("http://127.0.0.1:5000/latest-image")
       .then((response) => {
         if (response.ok) {

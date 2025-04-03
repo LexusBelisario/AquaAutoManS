@@ -1,6 +1,6 @@
 class DataService {
   static BASE_URL = "http://localhost:5000";
-  static POLLING_INTERVAL = 1000; // 1 second interval
+  static POLLING_INTERVAL = 1000;
 
   static async fetchData(endpoint) {
     try {

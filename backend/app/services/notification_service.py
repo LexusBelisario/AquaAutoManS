@@ -1,4 +1,3 @@
-# app/services/notification_service.py
 from datetime import datetime
 import logging
 from flask_socketio import SocketIO
@@ -13,7 +12,6 @@ class NotificationService:
 
     def send_alert(self, reading_id, alert_type, severity, parameter, value, message):
         try:
-            # Create new alert using your existing Alert model
             new_alert = Alert(
                 reading_id=reading_id,
                 alert_type=alert_type,
@@ -24,19 +22,15 @@ class NotificationService:
                 timestamp=datetime.utcnow()
             )
             
-            # Add to database
             db.session.add(new_alert)
             db.session.commit()
 
-            # Convert to dict for WebSocket emission
             alert_dict = new_alert.to_dict()
             
-            # Add to history
             self.alert_history.append(alert_dict)
             if len(self.alert_history) > self.max_history:
                 self.alert_history.pop(0)
 
-            # Emit via WebSocket
             socketio.emit('new_alert', alert_dict)
             
             return alert_dict

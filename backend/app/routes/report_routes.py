@@ -29,7 +29,6 @@ def print_data_report():
         time_filter = request.args.get('hours', default=0, type=int)
         date_filter = request.args.get('date', default=None, type=str)
 
-        # Validate date format if provided
         if date_filter:
             try:
                 datetime.strptime(date_filter, "%Y-%m-%d")
@@ -38,7 +37,6 @@ def print_data_report():
                     "error": "Invalid date format. Please use YYYY-MM-DD"
                 }), 400
 
-        # Validate hours if provided
         if time_filter < 0:
             return jsonify({
                 "error": "Hours filter must be a positive number"
@@ -53,7 +51,6 @@ def print_data_report():
         }), 500
         
 
-# Add error handlers for the blueprint
 @bp.errorhandler(404)
 def handle_404(e):
     return jsonify({

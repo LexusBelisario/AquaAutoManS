@@ -1,4 +1,3 @@
-# app/services/water_quality_service.py
 from flask import jsonify, send_file
 from app.models import aquamans
 from app import db
@@ -52,12 +51,10 @@ class WaterQualityService:
 
     def check_water_quality(self):
         try:
-            # Get latest record
             latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()
             if not latest_record:
                 return jsonify({"message": "No data available"})
 
-            # Get historical data for trend analysis
             three_hours_ago = latest_record.timeData - timedelta(hours=3)
             historical_data = (
                 aquamans.query
@@ -66,7 +63,6 @@ class WaterQualityService:
                 .all()
             )
 
-            # Analyze trends and calculate status
             analysis = self._analyze_parameters(latest_record, historical_data)
             
             return jsonify({
@@ -78,7 +74,6 @@ class WaterQualityService:
                     "alive_catfish": latest_record.catfish,
                     "priority_level": analysis['priority_level'],
                     
-                    # Current readings with trends
                     "temperature": latest_record.temperature,
                     "temperature_status": analysis['temperature']['status'],
                     "temperature_trend": analysis['temperature']['trend'],
@@ -95,22 +90,18 @@ class WaterQualityService:
                     "turbidity_status": analysis['turbidity']['status'],
                     "turbidity_trend": analysis['turbidity']['trend'],
 
-                    # Historical data for graphs
                     "temperature_history": self._format_historical_data(historical_data, 'temperature'),
                     "oxygen_history": self._format_historical_data(historical_data, 'oxygen'),
                     "ph_history": self._format_historical_data(historical_data, 'phlevel'),
                     "turbidity_history": self._format_historical_data(historical_data, 'turbidity'),
 
-                    # Detailed analysis
                     "parameter_analysis": analysis['detailed_analysis'],
                     "detected_issues": analysis['issues'],
                     "recommendations": analysis['recommendations'],
                     "monitoring_schedule": self._get_monitoring_schedule(analysis['priority_level']),
                     
-                    # Predictions
                     "predictions": self._generate_predictions(historical_data),
                     
-                    # Correlations
                     "parameter_correlations": self._calculate_correlations(historical_data)
                 }
             })
@@ -128,7 +119,6 @@ class WaterQualityService:
             'detailed_analysis': []
         }
 
-        # Analyze each parameter
         params = {
             'temperature': latest_record.temperature,
             'oxygen': latest_record.oxygen,
@@ -149,7 +139,6 @@ class WaterQualityService:
                     'message': param_analysis['message']
                 })
 
-        # Determine overall priority level
         if any(p['severity'] == 'critical' for p in analysis['detailed_analysis']):
             analysis['priority_level'] = 'Critical'
         elif any(p['severity'] == 'warning' for p in analysis['detailed_analysis']):
@@ -160,13 +149,10 @@ class WaterQualityService:
     def _analyze_single_parameter(self, param, value, historical_data):
         thresholds = self.parameter_thresholds[param]
         
-        # Calculate trend
         trend = self._calculate_trend(historical_data, param)
         
-        # Determine status and severity
         status, severity = self._get_parameter_status(param, value)
         
-        # Generate specific recommendations
         recommendations = self._generate_recommendations(param, value, status, trend)
         
         return {
@@ -202,7 +188,6 @@ class WaterQualityService:
                 y = np.array(values)
                 model.fit(X, y)
                 
-                # Predict next 6 hours
                 future_hours = np.array(range(max(times) + 1, max(times) + 7)).reshape(-1, 1)
                 predictions[param] = model.predict(future_hours).tolist()
             else:
@@ -348,10 +333,8 @@ class WaterQualityService:
                     for record in historical_data]
             
             if len(values) > 1:
-                # Calculate rate of change
                 rate_of_change = (values[-1] - values[0]) / (times[-1] - times[0])
                 
-                # Calculate acceleration (change in rate of change)
                 if len(values) > 2:
                     half_point = len(values) // 2
                     first_half_rate = (values[half_point] - values[0]) / (times[half_point] - times[0])
@@ -374,20 +357,16 @@ class WaterQualityService:
         if len(values) < 3:
             return "insufficient_data"
             
-        # Calculate differences between consecutive values
         differences = np.diff(values)
         
-        # Check for cyclic pattern
         if len(values) >= 6:
             autocorr = np.correlate(differences, differences, mode='full')
             if np.any(autocorr[len(differences)+1:] > 0.7 * autocorr[len(differences)]):
                 return "cyclic"
                 
-        # Check for stability
         if np.std(differences) < 0.1 * np.mean(np.abs(values)):
             return "steady"
             
-        # Check for erratic behavior
         if np.std(differences) > 0.5 * np.mean(np.abs(values)):
             return "erratic"
             
@@ -410,8 +389,6 @@ class WaterQualityService:
     def print_water_quality_report(self, alert_id):
         """Generate detailed PDF report for water quality"""
         try:
-            # Implementation similar to print_dead_catfish_report but focused on water quality
-            # Would you like to see this implementation as well?
             pass
             
         except Exception as e:
@@ -420,12 +397,10 @@ class WaterQualityService:
         
     def print_water_quality_report(self, alert_id):
             try:
-                # Get the data for the report
                 latest_record = aquamans.query.get(alert_id.replace('wq_', ''))
                 if not latest_record:
                     return jsonify({"message": "No data found for this alert."})
 
-                # Get historical data
                 three_hours_ago = latest_record.timeData - timedelta(hours=3)
                 historical_data = (
                     aquamans.query
@@ -434,13 +409,11 @@ class WaterQualityService:
                     .all()
                 )
 
-                # Analyze data
                 analysis = self._analyze_parameters(latest_record, historical_data)
                 trend_analysis = self._analyze_trends_detailed(historical_data)
                 correlations = self._calculate_correlations(historical_data)
                 predictions = self._generate_predictions(historical_data)
 
-                # Create PDF
                 buffer = BytesIO()
                 doc = SimpleDocTemplate(
                     buffer,
@@ -451,7 +424,6 @@ class WaterQualityService:
                     bottomMargin=36
                 )
 
-                # Define styles
                 styles = getSampleStyleSheet()
                 title_style = ParagraphStyle(
                     'CustomTitle',
@@ -480,10 +452,8 @@ class WaterQualityService:
                     leading=14
                 )
 
-                # Create story for PDF
                 story = []
 
-                # Add title and timestamp
                 story.append(Paragraph("Water Quality Analysis Report", title_style))
                 story.append(Paragraph(
                     f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
@@ -491,7 +461,6 @@ class WaterQualityService:
                 ))
                 story.append(Spacer(1, 20))
 
-                # Add current readings table
                 current_readings = [
                     ["Parameter", "Current Value", "Status", "Trend", "Normal Range"],
                     ["Temperature", f"{latest_record.temperature:.1f}°C", 
@@ -525,7 +494,6 @@ class WaterQualityService:
                 story.append(table)
                 story.append(Spacer(1, 20))
 
-                # Add trend analysis
                 story.append(Paragraph("Trend Analysis", heading2_style))
                 for param, analysis in trend_analysis.items():
                     story.append(Paragraph(
@@ -548,7 +516,6 @@ class WaterQualityService:
 
                 story.append(PageBreak())
 
-                # Add predictions
                 story.append(Paragraph("Predictions (Next 6 Hours)", heading2_style))
                 for param, pred_values in predictions.items():
                     if pred_values:
@@ -570,13 +537,11 @@ class WaterQualityService:
                         story.append(pred_table)
                         story.append(Spacer(1, 15))
 
-                # Add recommendations
                 story.append(Paragraph("Recommendations", heading2_style))
                 for rec in analysis['recommendations']:
                     story.append(Paragraph(f"• {rec}", normal_style))
                 story.append(Spacer(1, 20))
 
-                # Add monitoring schedule
                 story.append(Paragraph("Monitoring Schedule", heading2_style))
                 schedule = self._get_monitoring_schedule(analysis['priority_level'])
                 schedule_data = [[k.replace('_', ' ').title(), v] for k, v in schedule.items()]
@@ -589,7 +554,6 @@ class WaterQualityService:
                 ]))
                 story.append(schedule_table)
 
-                # Build PDF
                 doc.build(story)
                 buffer.seek(0)
 

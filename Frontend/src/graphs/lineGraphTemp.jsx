@@ -42,7 +42,6 @@ export const LineGraphTemp = () => {
         };
       }
 
-      // Create a map to store data by day
       const dailyData = new Map();
       const dayLabels = [
         "Monday",
@@ -55,7 +54,6 @@ export const LineGraphTemp = () => {
       ];
 
       if (filter === "3hours") {
-        // Process 3-hour data
         const labels = [];
         const temperatures = [];
 
@@ -81,11 +79,10 @@ export const LineGraphTemp = () => {
           ],
         };
       } else {
-        // Process weekly/daily data
         data.forEach((entry) => {
           if (entry.temperature != null) {
             const date = new Date(entry.timeData);
-            const dayIndex = (date.getDay() + 6) % 7; // Convert Sunday (0) to 6
+            const dayIndex = (date.getDay() + 6) % 7;
             const dayName = dayLabels[dayIndex];
 
             if (!dailyData.has(dayName)) {
@@ -95,7 +92,6 @@ export const LineGraphTemp = () => {
           }
         });
 
-        // Calculate averages for each day
         const averages = dayLabels.map((day) => {
           const temperatures = dailyData.get(day) || [];
           if (temperatures.length === 0) return 0;

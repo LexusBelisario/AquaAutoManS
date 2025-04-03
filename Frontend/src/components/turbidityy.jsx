@@ -9,7 +9,7 @@ export default function turbidityy() {
   useEffect(() => {
     const fetchTurbidity = async () => {
       try {
-        const response = await fetch("http://127.0.0.1:5000/turbidity"); // Update the URL to your Flask API endpoint
+        const response = await fetch("http://127.0.0.1:5000/turbidity");
         const data = await response.json();
         setTurbidity(data.turbidity);
       } catch (error) {
@@ -19,8 +19,8 @@ export default function turbidityy() {
 
     fetchTurbidity();
 
-    const interval = setInterval(fetchTurbidity, 5000); // Fetch new data every 5 seconds
-    return () => clearInterval(interval); // Cleanup the interval on component unmount
+    const interval = setInterval(fetchTurbidity, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const getTurbidityStatus = () => {

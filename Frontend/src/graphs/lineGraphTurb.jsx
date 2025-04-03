@@ -31,7 +31,7 @@ export const LineGraphTurb = () => {
 
   const processTurbidityData = useMemo(
     () => (data) => {
-      console.log("Processing turbidity data:", data); // Debug log
+      console.log("Processing turbidity data:", data);
 
       if (!Array.isArray(data) || data.length === 0) {
         console.log("No turbidity data to process");
@@ -65,37 +65,33 @@ export const LineGraphTurb = () => {
           ],
         };
       } else {
-        // For weekly view
         const dailyData = {
-          0: [], // Monday
-          1: [], // Tuesday
-          2: [], // Wednesday
-          3: [], // Thursday
-          4: [], // Friday
-          5: [], // Saturday
-          6: [], // Sunday
+          0: [],
+          1: [],
+          2: [],
+          3: [],
+          4: [],
+          5: [],
+          6: [],
         };
 
-        // Group data by day
         data.forEach((entry) => {
           const date = new Date(entry.timeData);
-          // Convert Sunday (0) to 6, and other days to 0-5
           const dayIndex = (date.getDay() + 6) % 7;
           if (entry.turbidity != null) {
             dailyData[dayIndex].push(entry.turbidity);
           }
         });
 
-        console.log("Grouped daily turbidity data:", dailyData); // Debug log
+        console.log("Grouped daily turbidity data:", dailyData);
 
-        // Calculate averages
         const avgTurbidityLevels = Object.values(dailyData).map((levels) => {
           if (levels.length === 0) return 0;
           const sum = levels.reduce((acc, level) => acc + level, 0);
           return parseFloat((sum / levels.length).toFixed(2));
         });
 
-        console.log("Calculated turbidity averages:", avgTurbidityLevels); // Debug log
+        console.log("Calculated turbidity averages:", avgTurbidityLevels);
 
         return {
           labels: [
@@ -141,13 +137,13 @@ export const LineGraphTurb = () => {
         url += `&week_start=${weekStart}`;
       }
 
-      console.log("Fetching turbidity data from:", url); // Debug log
+      console.log("Fetching turbidity data from:", url);
 
       setLoading(true);
       const response = await fetch(url);
       const data = await response.json();
 
-      console.log("Raw turbidity data from API:", data); // Debug log
+      console.log("Raw turbidity data from API:", data);
 
       if (!Array.isArray(data)) {
         console.error("Invalid turbidity data format received:", data);
@@ -156,7 +152,7 @@ export const LineGraphTurb = () => {
       }
 
       const processedData = processTurbidityData(data);
-      console.log("Processed turbidity data:", processedData); // Debug log
+      console.log("Processed turbidity data:", processedData);
 
       setCache((prevCache) => ({
         ...prevCache,

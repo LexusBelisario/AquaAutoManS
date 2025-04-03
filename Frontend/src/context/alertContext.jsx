@@ -11,7 +11,6 @@ import {
   Legend,
 } from "chart.js";
 
-// Register ChartJS components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -22,7 +21,6 @@ ChartJS.register(
   Legend
 );
 
-// Constants for parameter thresholds
 const PARAMETER_THRESHOLDS = {
   temperature: {
     critical_low: 20,
@@ -59,7 +57,6 @@ const PARAMETER_THRESHOLDS = {
   },
 };
 
-// Priority level styling
 const PRIORITY_STYLES = {
   Critical: "bg-red-100 border-red-500 text-red-700",
   High: "bg-orange-100 border-orange-500 text-orange-700",
@@ -301,7 +298,6 @@ export default function WaterQualityAlertBox({ alerts, removeAlert }) {
   );
 }
 
-// Parameter Card Component
 const ParameterCard = ({ name, value, unit, status, trend }) => (
   <div className="bg-white bg-opacity-75 rounded-lg p-3">
     <div className="text-sm font-medium text-gray-500">{name}</div>

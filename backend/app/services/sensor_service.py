@@ -1,4 +1,3 @@
-# app/services/sensor_service.py
 from flask import jsonify
 from app.models import aquamans
 from app import db

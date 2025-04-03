@@ -22,7 +22,7 @@ export default function TotalCatfish() {
     fetchTotalCatfish();
     const interval = setInterval(fetchTotalCatfish, 2000);
 
-    return () => clearInterval(interval); // Cleanup on component unmount
+    return () => clearInterval(interval);
   }, []);
 
   return (

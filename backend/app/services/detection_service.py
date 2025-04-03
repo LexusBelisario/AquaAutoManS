@@ -37,11 +37,10 @@ class DetectionService:
         
         while self.is_running:
             try:
-                # Check for hourly rest
                 elapsed_time = datetime.now() - self.start_time
                 if elapsed_time >= timedelta(hours=1):
                     logging.info("Taking 5-minute rest...")
-                    time.sleep(300)  # 5 minutes rest
+                    time.sleep(300) 
                     self.start_time = datetime.now()
                     continue
 
@@ -49,7 +48,6 @@ class DetectionService:
                 if not ret:
                     continue
 
-                # Process frame
                 results = self.model.predict(frame, conf=0.25, iou=0.5)
                 catfish_count = 0
                 dead_catfish_count = 0
@@ -62,7 +60,6 @@ class DetectionService:
                         else:
                             dead_catfish_count += 1
 
-                # Update database every 20 seconds
                 current_time = time.time()
                 if current_time - last_db_update >= 20:
                     self._update_database(frame, catfish_count, dead_catfish_count)
@@ -99,5 +96,4 @@ class DetectionService:
             logging.error(f"Database update error: {str(e)}")
             db.session.rollback()
 
-# Create global instance
 detection_service = DetectionService()

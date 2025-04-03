@@ -31,7 +31,7 @@ export const LineGraphPH = () => {
 
   const processPhLevelData = useMemo(
     () => (data) => {
-      console.log("Processing pH level data:", data); // Debug log
+      console.log("Processing pH level data:", data);
 
       if (!Array.isArray(data) || data.length === 0) {
         console.log("No pH level data to process");
@@ -65,37 +65,33 @@ export const LineGraphPH = () => {
           ],
         };
       } else {
-        // For weekly view
         const dailyData = {
-          0: [], // Monday
-          1: [], // Tuesday
-          2: [], // Wednesday
-          3: [], // Thursday
-          4: [], // Friday
-          5: [], // Saturday
-          6: [], // Sunday
+          0: [],
+          1: [],
+          2: [],
+          3: [],
+          4: [],
+          5: [],
+          6: [],
         };
 
-        // Group data by day
         data.forEach((entry) => {
           const date = new Date(entry.timeData);
-          // Convert Sunday (0) to 6, and other days to 0-5
           const dayIndex = (date.getDay() + 6) % 7;
           if (entry.phlevel != null) {
             dailyData[dayIndex].push(entry.phlevel);
           }
         });
 
-        console.log("Grouped daily pH level data:", dailyData); // Debug log
+        console.log("Grouped daily pH level data:", dailyData);
 
-        // Calculate averages
         const avgPhLevels = Object.values(dailyData).map((levels) => {
           if (levels.length === 0) return 0;
           const sum = levels.reduce((acc, level) => acc + level, 0);
           return parseFloat((sum / levels.length).toFixed(2));
         });
 
-        console.log("Calculated pH level averages:", avgPhLevels); // Debug log
+        console.log("Calculated pH level averages:", avgPhLevels);
 
         return {
           labels: [
@@ -141,13 +137,13 @@ export const LineGraphPH = () => {
         url += `&week_start=${weekStart}`;
       }
 
-      console.log("Fetching pH level data from:", url); // Debug log
+      console.log("Fetching pH level data from:", url);
 
       setLoading(true);
       const response = await fetch(url);
       const data = await response.json();
 
-      console.log("Raw pH level data from API:", data); // Debug log
+      console.log("Raw pH level data from API:", data);
 
       if (!Array.isArray(data)) {
         console.error("Invalid pH level data format received:", data);
@@ -156,7 +152,7 @@ export const LineGraphPH = () => {
       }
 
       const processedData = processPhLevelData(data);
-      console.log("Processed pH level data:", processedData); // Debug log
+      console.log("Processed pH level data:", processedData);
 
       setCache((prevCache) => ({
         ...prevCache,

@@ -1,4 +1,3 @@
-// src/components/DeadCatfish.js
 import React, { useEffect, useState } from "react";
 import deadfish from "../images/deadFish.svg";
 
@@ -11,15 +10,15 @@ export default function DeadCatfish() {
       try {
         const response = await fetch("http://localhost:5000/dead_catfish");
         const data = await response.json();
-        if (data.status === 'success') {
+        if (data.status === "success") {
           setDeadCount(data.dead_catfish || 0);
           setError(null);
         } else {
-          setError('Failed to fetch data');
+          setError("Failed to fetch data");
         }
       } catch (error) {
         console.error("Error fetching dead catfish count:", error);
-        setError('Failed to fetch data');
+        setError("Failed to fetch data");
       }
     };
 

@@ -7,7 +7,7 @@ const AboutUs = () => {
   const navigate = useNavigate();
 
   const handleBackClick = () => {
-    navigate("/main"); // Navigates back to the dashboard
+    navigate("/main");
   };
 
   return (

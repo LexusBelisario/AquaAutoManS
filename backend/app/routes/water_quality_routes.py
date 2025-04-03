@@ -10,12 +10,10 @@ water_quality_service = WaterQualityService()
 @bp.route('/check', methods=['GET'])
 def check_water_quality():
     try:
-        # Get latest record
         latest_record = aquamans.query.order_by(aquamans.timeData.desc()).first()
         if not latest_record:
             return jsonify({"message": "No data available"})
 
-        # Get historical data for trend analysis
         three_hours_ago = latest_record.timeData - timedelta(hours=3)
         historical_data = (
             aquamans.query
@@ -24,7 +22,6 @@ def check_water_quality():
             .all()
         )
 
-        # Calculate trends
         temperature_trend = calculate_trend([record.temperature for record in historical_data])
         oxygen_trend = calculate_trend([record.oxygen for record in historical_data])
         ph_trend = calculate_trend([record.phlevel for record in historical_data])

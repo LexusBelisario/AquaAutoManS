@@ -13,7 +13,7 @@ sensor_service = SensorService()
 sensor_cache = {
     'last_update': 0,
     'data': None,
-    'cache_duration': 0.5  # 500ms cache
+    'cache_duration': 0.5
 }
 
 def get_cached_sensor_data():
@@ -93,7 +93,6 @@ def update_detection():
         catfish_count = int(data.get('catfish', 0))
         dead_catfish_count = int(data.get('dead_catfish', 0))
         
-        # Get the latest record
         latest_record = aquamans.query.order_by(aquamans.id.desc()).first()
         
         if latest_record:

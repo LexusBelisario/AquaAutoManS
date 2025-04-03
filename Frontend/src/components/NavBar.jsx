@@ -33,7 +33,7 @@ export default function NavBar({ setAuth }) {
         </button>
         <button
           className="text-white font-medium text-xl hover:text-[#0b6477] mr-4"
-          onClick={handleLogsClick} // Add onClick handler
+          onClick={handleLogsClick}
         >
           <p className="pr-2">Logs</p>
         </button>

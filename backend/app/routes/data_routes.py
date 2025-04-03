@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from app import cache, db  # Import db here
+from app import cache, db
 from app.services.data_service import DataService
 from app.utils.limiters import limiter
 from app.models import aquamans
@@ -71,7 +71,6 @@ def get_filtered_turbidity_data():
     selected_week_start = request.args.get('week_start')
     return data_service.get_filtered_turbidity_data(filter_type, selected_date, selected_week_start)
 
-# Add support for weekly filter
 def handle_weekly_filter(query, week_start):
     """Helper function to handle weekly filtering"""
     if week_start:
@@ -97,7 +96,6 @@ def get_weekly_data():
 def get_latest_image():
     return data_service.get_latest_image()
 
-# Error handler for this blueprint
 @bp.errorhandler(404)
 def handle_404(e):
     return jsonify({

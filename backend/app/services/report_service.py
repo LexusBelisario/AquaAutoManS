@@ -48,7 +48,6 @@ class ReportService:
 
             possible_causes = []
 
-            # Temperature Analysis
             temperature_possibilities = []
             if 26 <= latest_record.temperature <= 32:
                 temperature_status = "The Water had a Normal Temperature"
@@ -69,7 +68,6 @@ class ReportService:
                 temp_cause_message = f"The Temperature suggests the presence of: {', '.join(temperature_possibilities)}."
                 possible_causes.append(temp_cause_message)
 
-            # Oxygen Analysis
             oxygen_possibilities = []
             if latest_record.oxygen <= 0.8:
                 oxygen_status = "The Water had a Very Low Oxygen"
@@ -87,7 +85,6 @@ class ReportService:
                 oxygen_cause_message = f"The Oxygen Level suggests the presence of: {', '. join(oxygen_possibilities)}."
                 possible_causes.append(oxygen_cause_message)
 
-            # pH Analysis
             ph_possibilities = []
             if latest_record.phlevel < 4:
                 ph_status = "The Water was Very Acidic"
@@ -149,7 +146,6 @@ class ReportService:
         try:
             logging.info(f"Starting dead catfish report generation for alert ID: {alert_id}")
             
-            # Get the latest dead catfish record
             latest_dead_record = (
                 aquamans.query.filter(aquamans.dead_catfish > 0)
                 .order_by(aquamans.timeData.desc())
@@ -163,18 +159,16 @@ class ReportService:
                     "reported_by": "New User"
                 })
 
-            # Get the previous 1800 records including the time of death
             recent_data = (
                 aquamans.query.filter(aquamans.timeData <= latest_dead_record.timeData)
                 .order_by(aquamans.timeData.desc())
                 .limit(1800)
                 .all()
             )
-            recent_data.reverse()  # Reverse to maintain chronological order
+            recent_data.reverse() 
 
             logging.info(f"Found {len(recent_data)} records in the data log")
 
-            # Initialize totals for analysis
             totals = {
                 'temperature': 0,
                 'oxygen': 0,
@@ -185,7 +179,6 @@ class ReportService:
                 'dead_catfish': 0
             }
 
-            # Create PDF
             buffer = BytesIO()
             doc = SimpleDocTemplate(
                 buffer,
@@ -196,7 +189,6 @@ class ReportService:
                 bottomMargin=36
             )
 
-            # Define styles
             styles = getSampleStyleSheet()
             title_style = ParagraphStyle(
                 'CustomTitle',
@@ -225,10 +217,8 @@ class ReportService:
                 leading=12
             )
 
-            # Create story for PDF
             story = []
 
-            # Add critical alert section first
             story.append(Paragraph("Case 5 - Dead Catfish Detected", title_style))
             story.append(Paragraph(
                 "IMMEDIATE ACTION REQUIRED: Remove dead catfish immediately to prevent water contamination!",
@@ -236,10 +226,8 @@ class ReportService:
             ))
             story.append(Spacer(1, 12))
 
-            # Add water regulation recommendations based on parameters
             water_regulations = []
             
-            # Temperature-based recommendations
             if latest_dead_record.temperature >= 35:
                 water_regulations.append(
                     "• CRITICAL: Water temperature is dangerously high. Take immediate action:\n"
@@ -269,7 +257,6 @@ class ReportService:
                     "  - Monitor temperature every hour"
                 )
 
-            # Oxygen-based recommendations
             if latest_dead_record.oxygen <= 0.8:
                 water_regulations.append(
                     "• CRITICAL: Oxygen levels are critically low. Take immediate action:\n"
@@ -285,7 +272,6 @@ class ReportService:
                     "  - Monitor oxygen levels hourly"
                 )
 
-            # pH-based recommendations
             if latest_dead_record.phlevel < 4 or latest_dead_record.phlevel > 9:
                 water_regulations.append(
                     "• CRITICAL: pH levels are at extreme levels. Take immediate action:\n"
@@ -300,14 +286,12 @@ class ReportService:
                     "  - Monitor pH levels regularly"
                 )
 
-            # Add water regulation recommendations to report
             if water_regulations:
                 story.append(Paragraph("Water Quality Regulation Required:", heading2_style))
                 for regulation in water_regulations:
                     story.append(Paragraph(regulation, normal_style))
                     story.append(Spacer(1, 8))
 
-            # Add immediate action steps
             story.append(Paragraph("Required Immediate Actions:", heading2_style))
             immediate_actions = [
                 "1. Remove dead catfish IMMEDIATELY regardless of water parameters",
@@ -321,7 +305,6 @@ class ReportService:
                 story.append(Paragraph(action, normal_style))
                 story.append(Spacer(1, 4))
 
-            # Add incident summary
             story.append(Paragraph("Incident Summary", heading2_style))
             incident_summary = [
                 ["Time of Death", "Total Catfish", "Dead Catfish", "Mortality Rate"],
@@ -344,7 +327,6 @@ class ReportService:
             story.append(summary_table)
             story.append(Spacer(1, 20))
 
-            # Add water parameters section
             story.append(Paragraph("Water Parameters at Time of Death", heading2_style))
             death_params = [
                 ["Parameter", "Value", "Status", "Normal Range"],
@@ -369,7 +351,6 @@ class ReportService:
             story.append(params_table)
             story.append(Spacer(1, 20))
 
-            # Check for natural causes if no critical water parameters
             natural_causes = self._check_natural_causes(latest_dead_record)
             if natural_causes:
                 story.append(Paragraph("Analysis of Non-Water Quality Factors", heading2_style))
@@ -377,7 +358,6 @@ class ReportService:
                     story.append(Paragraph(section, normal_style))
                     story.append(Spacer(1, 4))
 
-            # Add detailed data table
             story.append(PageBreak())
             story.append(Paragraph("Detailed Data Log", heading2_style))
             story.append(Spacer(1, 12))
@@ -417,28 +397,22 @@ class ReportService:
             story.append(table)
             story.append(Spacer(1, 20))
 
-            # Add dead catfish image section
             story.append(Paragraph("Dead Catfish Documentation", heading2_style))
             story.append(Spacer(1, 12))
 
-            # Find the record with an image
             image_added = False
             for record in recent_data:
                 if (record.dead_catfish > 0 and 
                     hasattr(record, 'dead_catfish_image') and 
                     record.dead_catfish_image):
                     try:
-                        # Create image with error handling
                         image = Image(BytesIO(record.dead_catfish_image))
                         
-                        # Calculate aspect ratio to maintain image proportions
                         aspect = image.imageWidth / float(image.imageHeight)
                         
-                        # Set max width to 6 inches, height will adjust automatically
                         image.drawWidth = 6 * inch
                         image.drawHeight = (6 * inch) / aspect
                         
-                        # Add image timestamp
                         story.append(Paragraph(
                             f"Image captured at: {record.timeData.strftime('%Y-%m-%d %H:%M:%S')}",
                             normal_style
@@ -447,7 +421,7 @@ class ReportService:
                         story.append(image)
                         story.append(Spacer(1, 12))
                         image_added = True
-                        break  # Exit after adding the first image
+                        break
                         
                     except Exception as img_error:
                         logging.error(f"Error processing image for record at {record.timeData}: {str(img_error)}")
@@ -462,7 +436,6 @@ class ReportService:
                     normal_style
                 ))
 
-            # Add report metadata
             story.append(PageBreak())
             story.append(Spacer(1, 20))
             
@@ -478,7 +451,6 @@ class ReportService:
                 story.append(Paragraph(line, normal_style))
                 story.append(Spacer(1, 4))
 
-            # Build PDF
             doc.build(story)
             buffer.seek(0)
 
@@ -501,7 +473,6 @@ class ReportService:
             })
     
     def _generate_analysis_message(self, record, mortality_rate):
-        # Temperature analysis
         if record.temperature > 35:
             temp_status = "Warm Temperature"
             temp_message = (
@@ -528,7 +499,6 @@ class ReportService:
                 "- Cold Water was used to fill the Aquarium"
             )
 
-        # Oxygen analysis
         if record.oxygen <= 0.8:
             oxygen_message = (
                 "The Water had Very Low Oxygen\nPossible Causes:\n"
@@ -725,13 +695,11 @@ class ReportService:
         """Identifies potential stress indicators from water parameters."""
         indicators = []
         
-        # Temperature stress
         if record.temperature <= 20 or record.temperature >= 35:
             indicators.append("Extreme temperature")
         elif 20 < record.temperature < 26 or 32 <= record.temperature < 35:
             indicators.append("Suboptimal temperature")
 
-        # Oxygen stress
         if record.oxygen <= 0.8:
             indicators.append("Critical oxygen levels")
         elif record.oxygen < 1.5:
@@ -739,13 +707,11 @@ class ReportService:
         elif record.oxygen > 5:
             indicators.append("Excessive oxygen")
 
-        # pH stress
         if record.phlevel < 4 or record.phlevel > 9:
             indicators.append("Extreme pH levels")
         elif 4 <= record.phlevel < 6 or 7.5 < record.phlevel <= 9:
             indicators.append("Suboptimal pH")
 
-        # Turbidity stress
         if record.turbidity >= 50:
             indicators.append("High turbidity")
         elif 20 <= record.turbidity < 50:
@@ -758,7 +724,6 @@ class ReportService:
         Detailed analysis of natural or external causes when water parameters are normal.
         Includes specific checks and targeted recommendations.
         """
-        # Check if all parameters are normal
         is_temp_normal = 26 <= record.temperature <= 32
         is_oxygen_normal = 1.5 <= record.oxygen <= 5
         is_ph_normal = 6 <= record.phlevel <= 7.5
@@ -843,7 +808,6 @@ class ReportService:
                 }
             }
 
-            # Format for PDF report
             report_sections = []
             report_sections.append("All water parameters are within normal ranges.")
             report_sections.append("Detailed Analysis of Other Possible Causes:\n")
@@ -921,7 +885,6 @@ class ReportService:
                     prev_record = data[i-1]
                     curr_record = data[i]
                     
-                    # Temperature fluctuation
                     temp = curr_record.temperature
                     if temp <= 20:
                         fluctuations['temperature'].append({
@@ -956,7 +919,6 @@ class ReportService:
                             'status': "Hot Temperature"
                         })
                     
-                    # Oxygen fluctuation
                     oxy = curr_record.oxygen
                     if oxy <= 0.8:
                         fluctuations['oxygen'].append({
@@ -983,7 +945,6 @@ class ReportService:
                             'status': "High Oxygen"
                         })
                     
-                    # pH fluctuation
                     ph = curr_record.phlevel
                     if ph < 4:
                         fluctuations['phlevel'].append({
@@ -1010,7 +971,6 @@ class ReportService:
                             'status': "Very Alkaline"
                         })
                     
-                    # Turbidity fluctuation
                     turb = curr_record.turbidity
                     if turb >= 50:
                         fluctuations['turbidity'].append({
@@ -1029,12 +989,10 @@ class ReportService:
                             'status': "Cloudy"
                         })
                 
-                # Determine case based on fluctuations
                 total_abnormal_params = sum(
                     1 for param_fluc in fluctuations.values() if param_fluc
                 )
                 
-                # Check for fish mortality
                 dead_fish = any(record.dead_catfish > 0 for record in data)
                 
                 if dead_fish:
@@ -1071,10 +1029,8 @@ class ReportService:
                         'case_description': "Significant variations observed in multiple water parameters.",
                         'fluctuations': fluctuations
                     }
-            # Classify the case
             case_classification = classify_case(recent_data)
 
-            # Prepare data for PDF
             data = [["Time", "Temperature", "Result", "Oxygen", "Result", 
                     "pH Level", "Result", "Turbidity", "Result", 
                     "Alive Catfish", "Dead Catfish"]]
@@ -1089,7 +1045,6 @@ class ReportService:
                 'dead_catfish': 0
             }
 
-            # Process data
             for record in recent_data:
                 time_str = record.timeData.strftime("%Y-%m-%d %H:%M:%S")
                 data.append([
@@ -1116,7 +1071,6 @@ class ReportService:
 
             logging.info("Creating PDF document")
 
-            # Create PDF
             buffer = BytesIO()
             doc = SimpleDocTemplate(
                 buffer,
@@ -1127,21 +1081,17 @@ class ReportService:
                 bottomMargin=36
             )
 
-            # Define styles
             styles = getSampleStyleSheet()
             title_style = styles["Heading1"]
             heading2_style = styles["Heading2"]
             normal_style = styles["Normal"]
 
-            # Create story for PDF
             story = []
 
-            # Add title
             title = "Aquamans Data Report"
             story.append(Paragraph(title, title_style))
             story.append(Spacer(1, 12))
 
-            # Add date/time range info
             if time_filter > 0:
                 period = f"Last {time_filter} Hours"
             else:
@@ -1149,7 +1099,6 @@ class ReportService:
             story.append(Paragraph(f"Period: {period}", normal_style))
             story.append(Spacer(1, 12))
 
-            # Add data table
             table = Table(data, repeatRows=1)
             table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
@@ -1166,7 +1115,6 @@ class ReportService:
             story.append(table)
             story.append(PageBreak())
 
-            # Add summary statistics
             if totals['count'] > 0:
                 story.append(Paragraph("Data Findings", heading2_style))
                 
@@ -1202,14 +1150,11 @@ class ReportService:
                 story.append(Paragraph("Critical Incidents Analysis", heading2_style))
             story.append(Spacer(1, 12))
 
-            # Track first occurrences of incidents
             critical_incidents = {}
 
-            # Analyze all records
             for record in recent_data:
                 time_str = record.timeData.strftime("%Y-%m-%d %H:%M:%S")
                 
-                # Temperature incidents
                 temp = float(record.temperature)
                 if temp <= 20:
                     if 'cold_temp' not in critical_incidents:
@@ -1263,7 +1208,6 @@ class ReportService:
                             ]
                         }
 
-                # Oxygen incidents
                 oxy = float(record.oxygen)
                 if oxy <= 0.8:
                     if 'very_low_oxygen' not in critical_incidents:
@@ -1306,7 +1250,6 @@ class ReportService:
                             ]
                         }
 
-                # pH incidents
                 ph = float(record.phlevel)
                 if ph < 4:
                     if 'very_acidic' not in critical_incidents:
@@ -1348,7 +1291,6 @@ class ReportService:
                             ]
                         }
 
-                # Turbidity incidents
                 turb = float(record.turbidity)
                 if turb >= 50:
                     if 'high_turbidity' not in critical_incidents:
@@ -1377,12 +1319,10 @@ class ReportService:
                             ]
                         }
 
-            # Display critical incidents
             if critical_incidents:
                 story.append(Paragraph("First Occurrences of Critical Incidents:", normal_style))
                 story.append(Spacer(1, 12))
                 
-                # Sort incidents by time
                 sorted_incidents = sorted(critical_incidents.values(), key=lambda x: x['time'])
                 
                 for incident in sorted_incidents:
@@ -1410,7 +1350,6 @@ class ReportService:
             story.insert(2, Paragraph(f"Case Description: {case_classification['case_description']}", normal_style))
             story.insert(3, Spacer(1, 12))
 
-        # Add fluctuations section if applicable
             if case_classification['case'] != "Case 1: Normal Readings":
                 story.insert(4, Paragraph("Fluctuations Detected:", heading2_style))
                 for param, fluc_list in case_classification['fluctuations'].items():

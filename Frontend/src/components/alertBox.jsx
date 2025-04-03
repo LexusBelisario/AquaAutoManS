@@ -2,7 +2,7 @@ import React from "react";
 
 export default function AlertBox({ alerts, removeAlert }) {
   const downloadReport = async (alertId) => {
-    console.log("alertId:", alertId); // Debugging line
+    console.log("alertId:", alertId);
     try {
       const response = await fetch(
         `http://localhost:5000/check_dead_catfish/print/${alertId}`,
@@ -19,7 +19,7 @@ export default function AlertBox({ alerts, removeAlert }) {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `dead_catfish_report_${alertId}.pdf`; // Unique file for each alert
+      a.download = `dead_catfish_report_${alertId}.pdf`;
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
@@ -38,7 +38,6 @@ export default function AlertBox({ alerts, removeAlert }) {
       ) : (
         <ul className="space-y-2">
           {alerts.map((alert, index) => {
-            // Check if the alert is about "No dead catfish detected"
             const isNoDeadCatfish =
               alert.details.message ===
               "No dead catfish detected in the system.";
