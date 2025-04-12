@@ -255,7 +255,6 @@ class IncidentService:
                     "• Remove deceased catfish promptly",
                     "• Monitor remaining catfish closely"
                 ],
-                "timestamp": "2025-03-21 15:12:43",
                 "reported_by": "LexusBelisario"
             }
             
@@ -286,6 +285,7 @@ class IncidentService:
                 "action": "Maintain Current Conditions",
                 "details": [
                     "Current Status:",
+                    "• All parameters within optimal ranges",
                     "• Temperature (26-32°C): Optimal for catfish growth",
                     "• Oxygen (1.5-5 mg/L): Optimal for feed intake",
                     "• pH (6-7.5): Optimal for overall health",
@@ -294,12 +294,12 @@ class IncidentService:
                     "• Clean Aquarium Slightly",
                     "• Maintain feeding schedule",
                     "• Calibrate Sensors to ensure accurate readings",
-                    "• Monitor catfish behavior"
+                    "• Monitor catfish behavior",
                     "• Perform Weekly Cleaning of Aquarium and Sensors",
                 ],
-                "timestamp": "2025-03-22 03:32:47",
                 "reported_by": "LexusBelisario"
             })
+            return recommendations
         
         elif case_number == 2:
             for param, fluc_list in fluctuations.items():
@@ -319,7 +319,6 @@ class IncidentService:
                                     "• Document temperature changes",
                                     "• Check environmental factors"
                                 ],
-                                "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
                         elif 32 < fluc_list[0]['value'] <= 33:
@@ -336,7 +335,6 @@ class IncidentService:
                                     "• Document temperature changes",
                                     "• Evaluate cooling system"
                                 ],
-                                "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
                     
@@ -355,7 +353,6 @@ class IncidentService:
                                     "• Reduce feeding temporarily",
                                     "• Prepare for water change if needed"
                                 ],
-                                "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
                         elif 5 < fluc_list[0]['value'] <= 6:
@@ -372,7 +369,6 @@ class IncidentService:
                                     "• Check equipment functionality",
                                     "• Document oxygen changes"
                                 ],
-                                "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
                     
@@ -391,7 +387,6 @@ class IncidentService:
                                     "• Check for acidic influences",
                                     "• Document pH changes"
                                 ],
-                                "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
                         elif 7.5 < fluc_list[0]['value'] <= 8.5:
@@ -408,7 +403,6 @@ class IncidentService:
                                     "• Check for alkaline influences",
                                     "• Document pH changes"
                                 ],
-                                "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
                     break
@@ -427,7 +421,6 @@ class IncidentService:
                     "• Document all parameter changes",
                     "• Prepare for emergency measures"
                 ],
-                "timestamp": "2025-03-21 15:12:43",
                 "reported_by": "LexusBelisario"
             })
             
@@ -446,7 +439,6 @@ class IncidentService:
                                 "• Verify equipment operation",
                                 "• Prepare backup temperature control"
                             ],
-                            "timestamp": "2025-03-21 15:12:43",
                             "reported_by": "LexusBelisario"
                         })
                     elif param == 'oxygen':
@@ -462,7 +454,6 @@ class IncidentService:
                                 "• Reduce stressful activities",
                                 "• Prepare emergency aeration"
                             ],
-                            "timestamp": "2025-03-21 15:12:43",
                             "reported_by": "LexusBelisario"
                         })
                     elif param == 'phlevel':
@@ -478,7 +469,6 @@ class IncidentService:
                                 "• Check for pH influences",
                                 "• Document all changes"
                             ],
-                            "timestamp": "2025-03-21 15:12:43",
                             "reported_by": "LexusBelisario"
                         })
         
@@ -496,7 +486,6 @@ class IncidentService:
                     "• Document all changes",
                     "• Prepare emergency equipment"
                 ],
-                "timestamp": "2025-03-21 15:12:43",
                 "reported_by": "LexusBelisario"
             })
             
@@ -516,7 +505,6 @@ class IncidentService:
                                     "• Monitor catfish behavior",
                                     "• Document temperature changes"
                                 ],
-                                "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
                         else:
@@ -532,7 +520,6 @@ class IncidentService:
                                     "• Monitor catfish behavior",
                                     "• Document temperature changes"
                                 ],
-                                "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
                     
@@ -550,7 +537,6 @@ class IncidentService:
                                     "• Monitor fish continuously",
                                     "• Document oxygen changes"
                                 ],
-                                "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
                         else: 
@@ -566,7 +552,6 @@ class IncidentService:
                                     "• Monitor fish continuously",
                                     "• Document oxygen changes"
                                 ],
-                                "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
                     
@@ -584,7 +569,6 @@ class IncidentService:
                                     "• Monitor fish continuously",
                                     "• Document pH changes"
                                 ],
-                                "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
                         else:
@@ -600,14 +584,23 @@ class IncidentService:
                                     "• Monitor fish continuously",
                                     "• Document pH changes"
                                 ],
-                                "timestamp": "2025-03-21 15:12:43",
                                 "reported_by": "LexusBelisario"
                             })
         
         return recommendations
+    
+    def _validate_case_1_parameters(self, current_readings):
+        temp = current_readings['temperature']['value']
+        oxy = current_readings['oxygen']['value']
+        ph = current_readings['phlevel']['value']
+        
+        return (
+            26 <= temp <= 32 and
+            1.5 <= oxy <= 5 and
+            6 <= ph <= 7.5
+        )
 
     def generate_pdf_report(self, report_data, incident_id):
-        """Generate a PDF report from the incident data"""
         try:
             buffer = BytesIO()
             
@@ -665,7 +658,7 @@ class IncidentService:
             
             metadata = [
                 ['Report ID:', incident_id],
-                ['Generated On:', report_data['catfish_info']['timestamp']], 
+                ['Generated On:', report_data['catfish_info']['timestamp']],
                 ['Generated By:', "LexusBelisario"],
                 ['Case Level:', f"Case {report_data['case']['number']} - {report_data['case']['severity']}"],
                 ['Description:', report_data['case']['description']],
@@ -767,7 +760,7 @@ class IncidentService:
                     elements.append(Spacer(1, 15))
             
             footer_text = (
-                f"Report generated on {report_data['catfish_info']['timestamp']} by LexusBelisario\n" 
+                f"Report generated on {report_data['catfish_info']['timestamp']} by LexusBelisario\n"
                 f"This report is automatically generated by the Aquaman Monitoring System"
             )
             elements.append(Spacer(1, 20))
